@@ -1,4 +1,5 @@
 #include "Renderer.h"
+#include "Game.h"
 #include "Shell.h"
 #include "Ship.h"
 #include <cmath>
@@ -65,9 +66,19 @@ void Renderer::drawBubbleTrail (const Ship& ship)
 {
     for (const auto& bubble : ship.getBubbles())
     {
-        Uint8 alpha = (Uint8) (bubble.alpha * 64); // 0.25 * 255 = ~64
+        Uint8 alpha = (Uint8) (bubble.alpha * 128); // Start at 50% opacity, fade to 0
         SDL_Color color = { 255, 255, 255, alpha };
         drawFilledCircle (bubble.position, bubble.radius, color);
+    }
+}
+
+void Renderer::drawSmoke (const Ship& ship)
+{
+    for (const auto& s : ship.getSmoke())
+    {
+        Uint8 alpha = (Uint8) (s.alpha * 180); // Start at 70% opacity, fade to 0
+        SDL_Color color = { 40, 40, 40, alpha }; // Dark grey/black smoke
+        drawFilledCircle (s.position, s.radius, color);
     }
 }
 
@@ -77,31 +88,111 @@ void Renderer::drawShell (const Shell& shell)
     drawFilledCircle (shell.getPosition(), shell.getRadius(), color);
 }
 
-void Renderer::drawCrosshair (Vec2 position, SDL_Color color)
+void Renderer::drawExplosion (const Explosion& explosion)
 {
+    float progress = explosion.getProgress();
+
+    // Explosion expands quickly then fades
+    float radius = explosion.maxRadius * std::sqrt (progress); // Fast initial expansion
+    float alpha = 1.0f - progress; // Fade out
+
+    if (explosion.isHit)
+    {
+        // Hit explosion - orange/yellow
+        SDL_Color outerColor = { 255, 150, 50, (Uint8) (alpha * 200) };
+        drawCircle (explosion.position, radius, outerColor);
+
+        if (radius > 5.0f)
+        {
+            SDL_Color midColor = { 255, 220, 100, (Uint8) (alpha * 180) };
+            drawCircle (explosion.position, radius * 0.7f, midColor);
+        }
+
+        if (radius > 10.0f)
+        {
+            SDL_Color coreColor = { 255, 255, 200, (Uint8) (alpha * 150) };
+            drawFilledCircle (explosion.position, radius * 0.3f, coreColor);
+        }
+    }
+    else
+    {
+        // Miss splash - blue/white
+        SDL_Color outerColor = { 100, 150, 255, (Uint8) (alpha * 200) };
+        drawCircle (explosion.position, radius, outerColor);
+
+        if (radius > 5.0f)
+        {
+            SDL_Color midColor = { 150, 200, 255, (Uint8) (alpha * 180) };
+            drawCircle (explosion.position, radius * 0.7f, midColor);
+        }
+
+        if (radius > 10.0f)
+        {
+            SDL_Color coreColor = { 220, 240, 255, (Uint8) (alpha * 150) };
+            drawFilledCircle (explosion.position, radius * 0.3f, coreColor);
+        }
+    }
+}
+
+void Renderer::drawCrosshair (const Ship& ship)
+{
+    Vec2 position = ship.getCrosshairPosition();
+    SDL_Color shipColor = ship.getColor();
+
+    // Crosshair is grey if not ready to fire
+    SDL_Color crosshairColor = ship.isReadyToFire() ? shipColor : SDL_Color { 100, 100, 100, 255 };
+
     float size = 15.0f;
 
     // Draw crosshair as two perpendicular lines
-    drawLine ({ position.x - size, position.y }, { position.x + size, position.y }, color);
-    drawLine ({ position.x, position.y - size }, { position.x, position.y + size }, color);
+    drawLine ({ position.x - size, position.y }, { position.x + size, position.y }, crosshairColor);
+    drawLine ({ position.x, position.y - size }, { position.x, position.y + size }, crosshairColor);
 
     // Draw small circle in center
-    drawCircle (position, 5.0f, color);
+    drawCircle (position, 5.0f, crosshairColor);
+
+    // Draw reload bar below crosshair
+    float barWidth = 40.0f;
+    float barHeight = 4.0f;
+    float barY = position.y + size + 8.0f;
+    SDL_Color barBg = { 60, 60, 60, 255 };
+    drawFilledRect ({ position.x - barWidth / 2.0f, barY }, barWidth, barHeight, barBg);
+
+    float reloadPct = ship.getReloadProgress();
+    SDL_Color reloadColor = reloadPct >= 1.0f ? SDL_Color { 100, 255, 100, 255 } : SDL_Color { 255, 100, 100, 255 };
+    drawFilledRect ({ position.x - barWidth / 2.0f, barY }, barWidth * reloadPct, barHeight, reloadColor);
+
+    // Draw 4 turret indicator circles below reload bar
+    float circleY = barY + barHeight + 6.0f;
+    float circleRadius = 4.0f;
+    float circleSpacing = 12.0f;
+    float startX = position.x - 1.5f * circleSpacing;
+
+    const auto& turrets = ship.getTurrets();
+    for (int i = 0; i < 4; ++i)
+    {
+        Vec2 circlePos = { startX + i * circleSpacing, circleY };
+        SDL_Color circleColor = turrets[i].isAimedAtTarget() ? shipColor : SDL_Color { 60, 60, 60, 255 };
+        drawFilledCircle (circlePos, circleRadius, circleColor);
+    }
 }
 
-void Renderer::drawShipHUD (const Ship& ship, int slot, int totalSlots, float screenWidth)
+void Renderer::drawShipHUD (const Ship& ship, int slot, int totalSlots, float screenWidth, float alpha)
 {
     float hudWidth = 200.0f;
-    float hudHeight = 60.0f;
+    float hudHeight = 50.0f;
     float spacing = 20.0f;
     float totalWidth = totalSlots * hudWidth + (totalSlots - 1) * spacing;
     float startX = (screenWidth - totalWidth) / 2.0f;
     float x = startX + slot * (hudWidth + spacing);
     float y = 10.0f;
 
-    SDL_Color shipColor = ship.getColor();
-    SDL_Color bgColor = { 30, 30, 30, 200 };
-    SDL_Color barBg = { 60, 60, 60, 255 };
+    Uint8 a = (Uint8) (alpha * 255);
+
+    SDL_Color shipColor = { ship.getColor().r, ship.getColor().g, ship.getColor().b, a };
+    SDL_Color bgColor = { 30, 30, 30, (Uint8) (alpha * 200) };
+    SDL_Color barBg = { 60, 60, 60, a };
+    SDL_Color white = { 255, 255, 255, a };
 
     // Background
     drawFilledRect ({ x, y }, hudWidth, hudHeight, bgColor);
@@ -119,22 +210,15 @@ void Renderer::drawShipHUD (const Ship& ship, int slot, int totalSlots, float sc
     float healthY = y + 6;
     drawFilledRect ({ barX, healthY }, barWidth, barHeight, barBg);
     float healthPct = ship.getHealth() / ship.getMaxHealth();
-    SDL_Color healthColor = { (Uint8) (255 * (1 - healthPct)), (Uint8) (255 * healthPct), 0, 255 };
+    SDL_Color healthColor = { (Uint8) (255 * (1 - healthPct)), (Uint8) (255 * healthPct), 0, a };
     drawFilledRect ({ barX, healthY }, barWidth * healthPct, barHeight, healthColor);
 
-    // Reload bar
-    float reloadY = y + 17;
-    drawFilledRect ({ barX, reloadY }, barWidth, barHeight, barBg);
-    float reloadPct = ship.getReloadProgress();
-    SDL_Color reloadColor = reloadPct >= 1.0f ? SDL_Color { 100, 255, 100, 255 } : SDL_Color { 255, 100, 100, 255 };
-    drawFilledRect ({ barX, reloadY }, barWidth * reloadPct, barHeight, reloadColor);
-
     // Throttle bar (centered, negative goes left, positive goes right)
-    float throttleY = y + 28;
+    float throttleY = y + 17;
     drawFilledRect ({ barX, throttleY }, barWidth, barHeight, barBg);
     float throttle = ship.getThrottle();
     float throttleCenter = barX + barWidth / 2.0f;
-    SDL_Color throttleColor = { 100, 150, 255, 255 };
+    SDL_Color throttleColor = { 100, 150, 255, a };
     if (throttle > 0)
     {
         drawFilledRect ({ throttleCenter, throttleY }, barWidth / 2.0f * throttle, barHeight, throttleColor);
@@ -145,14 +229,14 @@ void Renderer::drawShipHUD (const Ship& ship, int slot, int totalSlots, float sc
         drawFilledRect ({ throttleCenter - negWidth, throttleY }, negWidth, barHeight, throttleColor);
     }
     // Center line
-    drawLine ({ throttleCenter, throttleY }, { throttleCenter, throttleY + barHeight }, { 255, 255, 255, 255 });
+    drawLine ({ throttleCenter, throttleY }, { throttleCenter, throttleY + barHeight }, white);
 
     // Rudder bar (centered, negative goes left, positive goes right)
-    float rudderY = y + 39;
+    float rudderY = y + 28;
     drawFilledRect ({ barX, rudderY }, barWidth, barHeight, barBg);
     float rudder = ship.getRudder();
     float rudderCenter = barX + barWidth / 2.0f;
-    SDL_Color rudderColor = { 255, 200, 100, 255 };
+    SDL_Color rudderColor = { 255, 200, 100, a };
     if (rudder > 0)
     {
         drawFilledRect ({ rudderCenter, rudderY }, barWidth / 2.0f * rudder, barHeight, rudderColor);
@@ -163,14 +247,14 @@ void Renderer::drawShipHUD (const Ship& ship, int slot, int totalSlots, float sc
         drawFilledRect ({ rudderCenter - negWidth, rudderY }, negWidth, barHeight, rudderColor);
     }
     // Center line
-    drawLine ({ rudderCenter, rudderY }, { rudderCenter, rudderY + barHeight }, { 255, 255, 255, 255 });
+    drawLine ({ rudderCenter, rudderY }, { rudderCenter, rudderY + barHeight }, white);
 }
 
 void Renderer::drawWindIndicator (Vec2 wind, float screenWidth, float screenHeight)
 {
-    // Draw wind indicator in bottom-right corner
-    float indicatorSize = 40.0f;
-    Vec2 center = { screenWidth - 60, screenHeight - 60 };
+    // Draw wind indicator in upper-right corner
+    float indicatorSize = 20.0f;
+    Vec2 center = { screenWidth - 35, 35 };
 
     // Background circle
     SDL_Color bgColor = { 30, 30, 30, 200 };
@@ -191,7 +275,7 @@ void Renderer::drawWindIndicator (Vec2 wind, float screenWidth, float screenHeig
         drawLine (center, arrowEnd, arrowColor);
 
         // Arrow head
-        float headSize = 8.0f;
+        float headSize = 4.0f;
         float headAngle = 0.5f;
         Vec2 head1 = arrowEnd - windDir * headSize + Vec2::fromAngle (windDir.toAngle() + M_PI * 0.5f) * headSize * 0.5f;
         Vec2 head2 = arrowEnd - windDir * headSize - Vec2::fromAngle (windDir.toAngle() + M_PI * 0.5f) * headSize * 0.5f;
@@ -200,7 +284,7 @@ void Renderer::drawWindIndicator (Vec2 wind, float screenWidth, float screenHeig
     }
 
     // Label
-    drawText ("WIND", { center.x - 12, center.y + indicatorSize + 5 }, 1.5f, { 150, 150, 150, 255 });
+    drawText ("WIND", { center.x - 6, center.y + indicatorSize + 3 }, 0.75f, { 150, 150, 150, 255 });
 }
 
 void Renderer::drawOval (Vec2 center, float width, float height, float angle, SDL_Color color)
@@ -301,6 +385,7 @@ void Renderer::drawCircle (Vec2 center, float radius, SDL_Color color)
 
 void Renderer::drawFilledCircle (Vec2 center, float radius, SDL_Color color)
 {
+    SDL_SetRenderDrawBlendMode (renderer, SDL_BLENDMODE_BLEND);
     SDL_SetRenderDrawColor (renderer, color.r, color.g, color.b, color.a);
 
     // Draw filled circle using horizontal scanlines
@@ -317,12 +402,14 @@ void Renderer::drawFilledCircle (Vec2 center, float radius, SDL_Color color)
 
 void Renderer::drawLine (Vec2 start, Vec2 end, SDL_Color color)
 {
+    SDL_SetRenderDrawBlendMode (renderer, SDL_BLENDMODE_BLEND);
     SDL_SetRenderDrawColor (renderer, color.r, color.g, color.b, color.a);
     SDL_RenderLine (renderer, start.x, start.y, end.x, end.y);
 }
 
 void Renderer::drawRect (Vec2 topLeft, float width, float height, SDL_Color color)
 {
+    SDL_SetRenderDrawBlendMode (renderer, SDL_BLENDMODE_BLEND);
     SDL_SetRenderDrawColor (renderer, color.r, color.g, color.b, color.a);
     SDL_FRect rect = { topLeft.x, topLeft.y, width, height };
     SDL_RenderRect (renderer, &rect);
@@ -330,6 +417,7 @@ void Renderer::drawRect (Vec2 topLeft, float width, float height, SDL_Color colo
 
 void Renderer::drawFilledRect (Vec2 topLeft, float width, float height, SDL_Color color)
 {
+    SDL_SetRenderDrawBlendMode (renderer, SDL_BLENDMODE_BLEND);
     SDL_SetRenderDrawColor (renderer, color.r, color.g, color.b, color.a);
     SDL_FRect rect = { topLeft.x, topLeft.y, width, height };
     SDL_RenderFillRect (renderer, &rect);

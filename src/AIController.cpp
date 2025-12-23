@@ -27,8 +27,28 @@ void AIController::updateWander (float dt, const Ship& myShip, float arenaWidth,
         wanderTimer = wanderInterval + (rand() / (float) RAND_MAX) * 2.0f;
     }
 
+    Vec2 pos = myShip.getPosition();
+    float margin = myShip.getLength();
+
+    // Check if near edge or stopped (likely hit something)
+    bool nearEdge = pos.x < margin || pos.x > arenaWidth - margin ||
+                    pos.y < margin || pos.y > arenaHeight - margin;
+    bool stopped = myShip.getSpeed() < 0.5f && std::abs (myShip.getThrottle()) > 0.1f;
+
+    if (nearEdge || stopped)
+    {
+        // Reverse and turn away
+        moveInput.y = 0.5f; // Positive Y is reverse
+        moveInput.x = (rand() % 2 == 0) ? 1.0f : -1.0f; // Random turn direction
+
+        // Pick a new target toward center
+        wanderTarget = { arenaWidth / 2.0f, arenaHeight / 2.0f };
+        wanderTimer = 2.0f;
+        return;
+    }
+
     // Move toward wander target
-    Vec2 toTarget = wanderTarget - myShip.getPosition();
+    Vec2 toTarget = wanderTarget - pos;
     float distance = toTarget.length();
 
     if (distance < 50.0f)
@@ -41,7 +61,6 @@ void AIController::updateWander (float dt, const Ship& myShip, float arenaWidth,
         // Calculate desired direction
         Vec2 desiredDir = toTarget.normalized();
         float shipAngle = myShip.getAngle();
-        Vec2 shipForward = Vec2::fromAngle (shipAngle);
 
         // Calculate angle to target
         float targetAngle = desiredDir.toAngle();
@@ -78,20 +97,37 @@ void AIController::updateAim (const Ship& myShip, const Ship* targetShip)
 
         if (distance > 0.01f)
         {
-            aimInput = toTarget.normalized();
+            // Calculate where crosshair should be (at target position)
+            Vec2 desiredCrosshairPos = targetShip->getPosition();
+            Vec2 currentCrosshairPos = myShip.getCrosshairPosition();
 
-            // Fire if target is within reasonable range
-            fireInput = distance < 400.0f;
+            // Move crosshair toward target
+            Vec2 crosshairDiff = desiredCrosshairPos - currentCrosshairPos;
+            float crosshairDist = crosshairDiff.length();
+
+            if (crosshairDist > 5.0f)
+            {
+                // Move crosshair toward target position
+                aimInput = crosshairDiff.normalized();
+            }
+            else
+            {
+                aimInput = { 0, 0 };
+            }
+
+            // Fire if crosshair is close to target and ship is ready
+            fireInput = crosshairDist < 30.0f && distance < 400.0f && myShip.isReadyToFire();
         }
         else
         {
+            aimInput = { 0, 0 };
             fireInput = false;
         }
     }
     else
     {
-        // No target, aim forward and don't fire
-        aimInput = Vec2::fromAngle (myShip.getAngle());
+        // No target, don't move crosshair and don't fire
+        aimInput = { 0, 0 };
         fireInput = false;
     }
 }

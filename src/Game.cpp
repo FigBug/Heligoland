@@ -14,7 +14,7 @@ bool Game::init()
         return false;
     }
 
-    window = SDL_CreateWindow ("Heligoland", WINDOW_WIDTH, WINDOW_HEIGHT, 0);
+    window = SDL_CreateWindow ("Heligoland", WINDOW_WIDTH, WINDOW_HEIGHT, SDL_WINDOW_RESIZABLE);
     if (! window)
     {
         SDL_Log ("Failed to create window: %s", SDL_GetError());
@@ -161,6 +161,7 @@ void Game::startGame()
     }
 
     shells.clear();
+    explosions.clear();
     winnerIndex = -1;
     gameOverTimer = 0.0f;
     gameStartDelay = 0.5f; // Ignore fire input for first 0.5 seconds
@@ -181,10 +182,18 @@ void Game::updateWind (float dt)
     windChangeTimer -= dt;
     if (windChangeTimer <= 0)
     {
-        // Pick new target wind
-        float windAngle = ((float) rand() / RAND_MAX) * 2.0f * M_PI;
-        float windStrength = ((float) rand() / RAND_MAX);
-        targetWind = Vec2::fromAngle (windAngle) * windStrength;
+        // Pick new target wind - minor adjustment from current wind
+        // Small angle change (up to 30 degrees either way)
+        float currentAngle = std::atan2 (wind.y, wind.x);
+        float angleChange = ((float) rand() / RAND_MAX - 0.5f) * M_PI / 3.0f; // +/- 30 degrees
+        float newAngle = currentAngle + angleChange;
+
+        // Small strength change (up to 20% either way)
+        float currentStrength = wind.length();
+        float strengthChange = ((float) rand() / RAND_MAX - 0.5f) * 0.4f;
+        float newStrength = std::clamp (currentStrength + strengthChange, 0.1f, 1.0f);
+
+        targetWind = Vec2::fromAngle (newAngle) * newStrength;
         windChangeTimer = WIND_CHANGE_INTERVAL;
     }
 
@@ -195,6 +204,9 @@ void Game::updateWind (float dt)
 
 void Game::updatePlaying (float dt)
 {
+    float arenaWidth, arenaHeight;
+    getWindowSize (arenaWidth, arenaHeight);
+
     // Update start delay
     if (gameStartDelay > 0)
     {
@@ -240,13 +252,13 @@ void Game::updatePlaying (float dt)
                 }
             }
 
-            aiControllers[i]->update (dt, *ships[i], target, WINDOW_WIDTH, WINDOW_HEIGHT);
+            aiControllers[i]->update (dt, *ships[i], target, arenaWidth, arenaHeight);
             moveInput = aiControllers[i]->getMoveInput();
             aimInput = aiControllers[i]->getAimInput();
             fireInput = aiControllers[i]->getFireInput();
         }
 
-        ships[i]->update (dt, moveInput, aimInput, fireInput, WINDOW_WIDTH, WINDOW_HEIGHT);
+        ships[i]->update (dt, moveInput, aimInput, fireInput, arenaWidth, arenaHeight, wind);
 
         // Collect pending shells from ship
         auto& pendingShells = ships[i]->getPendingShells();
@@ -262,6 +274,16 @@ void Game::updatePlaying (float dt)
 
     // Check for collisions
     checkCollisions();
+
+    // Update explosions
+    for (auto& explosion : explosions)
+    {
+        explosion.timer += dt;
+    }
+    explosions.erase (
+        std::remove_if (explosions.begin(), explosions.end(), [] (const Explosion& e)
+                        { return ! e.isAlive(); }),
+        explosions.end());
 
     // Check for game over
     checkGameOver();
@@ -284,6 +306,7 @@ void Game::returnToTitle()
         ship.reset();
     }
     shells.clear();
+    explosions.clear();
     state = GameState::Title;
 }
 
@@ -330,14 +353,39 @@ void Game::checkCollisions()
             if (dist < hitRadius + shell.getSplashRadius())
             {
                 ship->takeDamage (SHELL_DAMAGE);
+
+                // Spawn hit explosion
+                Explosion explosion;
+                explosion.position = shell.getPosition();
+                explosion.isHit = true;
+                explosions.push_back (explosion);
+
+                // Check if ship was sunk
+                if (! ship->isAlive())
+                {
+                    // Big explosion for sinking
+                    Explosion sinkExplosion;
+                    sinkExplosion.position = ship->getPosition();
+                    sinkExplosion.isHit = true;
+                    sinkExplosion.maxRadius = 80.0f;
+                    sinkExplosion.duration = 1.0f;
+                    explosions.push_back (sinkExplosion);
+                }
+
                 shell.kill();
                 break;
             }
         }
 
         // Kill landed shells after checking for hits (they splash and disappear)
-        if (shell.hasLanded())
+        if (shell.hasLanded() && shell.isAlive())
         {
+            // Spawn splash (miss) - hits are handled above
+            Explosion splash;
+            splash.position = shell.getPosition();
+            splash.isHit = false;
+            explosions.push_back (splash);
+
             shell.kill();
         }
     }
@@ -485,9 +533,12 @@ void Game::render()
 
 void Game::renderTitle()
 {
+    float w, h;
+    getWindowSize (w, h);
+
     // Draw title
     SDL_Color titleColor = { 255, 255, 255, 255 };
-    renderer->drawTextCentered ("HELIGOLAND", { WINDOW_WIDTH / 2.0f, WINDOW_HEIGHT / 3.0f }, 8.0f, titleColor);
+    renderer->drawTextCentered ("HELIGOLAND", { w / 2.0f, h / 3.0f }, 8.0f, titleColor);
 
     // Draw connected players
     SDL_Color subtitleColor = { 200, 200, 200, 255 };
@@ -501,12 +552,12 @@ void Game::renderTitle()
     }
 
     std::string playerText = std::to_string (connectedCount) + " PLAYERS CONNECTED";
-    renderer->drawTextCentered (playerText, { WINDOW_WIDTH / 2.0f, WINDOW_HEIGHT / 2.0f }, 3.0f, subtitleColor);
+    renderer->drawTextCentered (playerText, { w / 2.0f, h / 2.0f }, 3.0f, subtitleColor);
 
     // Draw player slots
-    float slotY = WINDOW_HEIGHT * 0.6f;
+    float slotY = h * 0.6f;
     float slotSpacing = 80.0f;
-    float startX = WINDOW_WIDTH / 2.0f - (NUM_SHIPS - 1) * slotSpacing / 2.0f;
+    float startX = w / 2.0f - (NUM_SHIPS - 1) * slotSpacing / 2.0f;
 
     for (int i = 0; i < NUM_SHIPS; ++i)
     {
@@ -547,12 +598,15 @@ void Game::renderTitle()
 
     // Draw start instruction
     SDL_Color instructColor = { 150, 150, 150, 255 };
-    renderer->drawTextCentered ("PRESS TRIGGER TO START", { WINDOW_WIDTH / 2.0f, WINDOW_HEIGHT * 0.85f }, 2.0f, instructColor);
+    renderer->drawTextCentered ("PRESS TRIGGER TO START", { w / 2.0f, h * 0.85f }, 2.0f, instructColor);
 }
 
 void Game::renderPlaying()
 {
-    // Draw bubble trails first (behind ships)
+    float w, h;
+    getWindowSize (w, h);
+
+    // Draw bubble trails first (behind everything)
     for (const auto& ship : ships)
     {
         if (ship && ship->isAlive())
@@ -561,88 +615,133 @@ void Game::renderPlaying()
         }
     }
 
-    // Draw shells
-    for (const auto& shell : shells)
-    {
-        renderer->drawShell (shell);
-    }
-
     // Draw ships
     for (const auto& ship : ships)
     {
         if (ship && ship->isAlive())
         {
             renderer->drawShip (*ship);
-            // Crosshair is grey if not ready to fire, ship color if ready
-            SDL_Color crosshairColor = ship->isReadyToFire()
-                                           ? ship->getColor()
-                                           : SDL_Color { 100, 100, 100, 255 };
-            renderer->drawCrosshair (ship->getCrosshairPosition(), crosshairColor);
+        }
+    }
+
+    // Draw smoke (above ships)
+    for (const auto& ship : ships)
+    {
+        if (ship && ship->isAlive())
+        {
+            renderer->drawSmoke (*ship);
+        }
+    }
+
+    // Draw shells (on top of ships)
+    for (const auto& shell : shells)
+    {
+        renderer->drawShell (shell);
+    }
+
+    // Draw explosions
+    for (const auto& explosion : explosions)
+    {
+        renderer->drawExplosion (explosion);
+    }
+
+    // Draw crosshairs (on top of everything)
+    for (const auto& ship : ships)
+    {
+        if (ship && ship->isAlive())
+        {
+            renderer->drawCrosshair (*ship);
         }
     }
 
     // Draw HUD for each ship
+    float hudWidth = 200.0f;
+    float hudHeight = 50.0f;
+    float hudSpacing = 20.0f;
+    float hudTotalWidth = NUM_SHIPS * hudWidth + (NUM_SHIPS - 1) * hudSpacing;
+    float hudStartX = (w - hudTotalWidth) / 2.0f;
+    float hudY = 10.0f;
+
     int slot = 0;
     for (const auto& ship : ships)
     {
         if (ship && ship->isAlive())
         {
-            renderer->drawShipHUD (*ship, slot, NUM_SHIPS, WINDOW_WIDTH);
+            // Check if any ship is under this HUD panel
+            float hudX = hudStartX + slot * (hudWidth + hudSpacing);
+            float alpha = 1.0f;
+
+            for (const auto& otherShip : ships)
+            {
+                if (otherShip && otherShip->isAlive())
+                {
+                    Vec2 pos = otherShip->getPosition();
+                    // Check if ship position is within HUD bounds (with some margin)
+                    float margin = otherShip->getLength() / 2.0f;
+                    if (pos.x > hudX - margin && pos.x < hudX + hudWidth + margin &&
+                        pos.y > hudY - margin && pos.y < hudY + hudHeight + margin)
+                    {
+                        alpha = 0.25f;
+                        break;
+                    }
+                }
+            }
+
+            renderer->drawShipHUD (*ship, slot, NUM_SHIPS, w, alpha);
         }
         slot++;
     }
 
     // Draw wind indicator
-    renderer->drawWindIndicator (wind, WINDOW_WIDTH, WINDOW_HEIGHT);
+    renderer->drawWindIndicator (wind, w, h);
 }
 
 void Game::renderGameOver()
 {
+    float w, h;
+    getWindowSize (w, h);
+
     SDL_Color textColor = { 255, 255, 255, 255 };
 
     if (winnerIndex >= 0)
     {
         std::string winText = "PLAYER " + std::to_string (winnerIndex + 1) + " WINS!";
-        renderer->drawTextCentered (winText, { WINDOW_WIDTH / 2.0f, WINDOW_HEIGHT / 2.0f }, 5.0f, textColor);
+        renderer->drawTextCentered (winText, { w / 2.0f, h / 2.0f }, 5.0f, textColor);
     }
     else
     {
-        renderer->drawTextCentered ("DRAW!", { WINDOW_WIDTH / 2.0f, WINDOW_HEIGHT / 2.0f }, 5.0f, textColor);
+        renderer->drawTextCentered ("DRAW!", { w / 2.0f, h / 2.0f }, 5.0f, textColor);
     }
 }
 
 Vec2 Game::getShipStartPosition (int index) const
 {
-    float margin = 150.0f;
-    switch (index)
-    {
-        case 0:
-            return { margin, margin }; // Top-left
-        case 1:
-            return { WINDOW_WIDTH - margin, margin }; // Top-right
-        case 2:
-            return { margin, WINDOW_HEIGHT - margin }; // Bottom-left
-        case 3:
-            return { WINDOW_WIDTH - margin, WINDOW_HEIGHT - margin }; // Bottom-right
-        default:
-            return { WINDOW_WIDTH / 2.0f, WINDOW_HEIGHT / 2.0f };
-    }
+    float w, h;
+    getWindowSize (w, h);
+
+    // Place ships in a circle around the center, equidistant from each other
+    Vec2 center = { w / 2.0f, h / 2.0f };
+    float radius = std::min (w, h) * 0.35f; // 35% of smaller dimension
+
+    // Start at top and go clockwise
+    float angleOffset = -M_PI / 2.0f; // Start at top
+    float angle = angleOffset + (index * 2.0f * M_PI / NUM_SHIPS);
+
+    return center + Vec2::fromAngle (angle) * radius;
 }
 
 float Game::getShipStartAngle (int index) const
 {
-    // Point ships toward center
-    switch (index)
-    {
-        case 0:
-            return M_PI * 0.25f; // 45 degrees
-        case 1:
-            return M_PI * 0.75f; // 135 degrees
-        case 2:
-            return -M_PI * 0.25f; // -45 degrees
-        case 3:
-            return -M_PI * 0.75f; // -135 degrees
-        default:
-            return 0.0f;
-    }
+    // Point ships toward center (opposite of their position angle)
+    float angleOffset = -M_PI / 2.0f; // Start at top
+    float posAngle = angleOffset + (index * 2.0f * M_PI / NUM_SHIPS);
+    return posAngle + M_PI; // Point toward center
+}
+
+void Game::getWindowSize (float& width, float& height) const
+{
+    int w, h;
+    SDL_GetWindowSizeInPixels (window, &w, &h);
+    width = (float) w;
+    height = (float) h;
 }

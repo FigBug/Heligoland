@@ -17,6 +17,18 @@ enum class GameState
     GameOver
 };
 
+struct Explosion
+{
+    Vec2 position;
+    float timer = 0.0f;
+    float duration = 0.5f;
+    float maxRadius = 30.0f;
+    bool isHit = false; // true = explosion (orange), false = splash (blue)
+
+    float getProgress() const { return timer / duration; }
+    bool isAlive() const { return timer < duration; }
+};
+
 class Game
 {
 public:
@@ -32,7 +44,7 @@ private:
     static constexpr int WINDOW_HEIGHT = 720;
     static constexpr int NUM_SHIPS = 4;
     static constexpr float SHELL_DAMAGE = 100.0f;
-    static constexpr float GAME_OVER_DELAY = 3.0f;
+    static constexpr float GAME_OVER_DELAY = 5.0f;
 
     SDL_Window* window = nullptr;
     SDL_Renderer* sdlRenderer = nullptr;
@@ -49,14 +61,15 @@ private:
     std::array<std::unique_ptr<Player>, NUM_SHIPS> players;
     std::array<std::unique_ptr<AIController>, NUM_SHIPS> aiControllers;
     std::vector<Shell> shells;
+    std::vector<Explosion> explosions;
 
     // Wind system
     Vec2 wind; // Current wind direction and strength (length = strength 0-1)
     Vec2 targetWind; // Wind is slowly moving toward this target
     float windChangeTimer = 0.0f;
-    static constexpr float WIND_CHANGE_INTERVAL = 5.0f; // Seconds between wind target changes
-    static constexpr float WIND_LERP_SPEED = 0.3f; // How fast wind changes
-    static constexpr float MAX_WIND_DRIFT = 0.05f; // 5% max drift
+    static constexpr float WIND_CHANGE_INTERVAL = 60.0f; // Seconds between wind target changes
+    static constexpr float WIND_LERP_SPEED = 0.05f; // How fast wind changes (very gradual)
+    static constexpr float MAX_WIND_DRIFT = 0.01f; // 1% max drift
 
     void updateWind (float dt);
 
@@ -84,4 +97,5 @@ private:
 
     Vec2 getShipStartPosition (int index) const;
     float getShipStartAngle (int index) const;
+    void getWindowSize (float& width, float& height) const;
 };

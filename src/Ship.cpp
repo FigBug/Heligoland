@@ -15,8 +15,12 @@ Ship::Ship (int playerIndex_, Vec2 startPos, float startAngle)
     crosshairOffset = Vec2::fromAngle (angle) * 150.0f;
 }
 
-void Ship::update (float dt, Vec2 moveInput, Vec2 aimInput, bool fireInput, float arenaWidth, float arenaHeight)
+void Ship::update (float dt, Vec2 moveInput, Vec2 aimInput, bool fireInput, float arenaWidth, float arenaHeight, Vec2 wind)
 {
+    // Calculate damage penalty (up to 20% reduction in speed and turning)
+    float damagePercent = getDamagePercent();
+    float damagePenalty = 1.0f - (damagePercent * 0.2f);
+
     // Update fire timer
     if (fireTimer > 0)
     {
@@ -63,19 +67,19 @@ void Ship::update (float dt, Vec2 moveInput, Vec2 aimInput, bool fireInput, floa
         }
     }
 
-    // Apply throttle to velocity
+    // Apply throttle to velocity (reduced by damage)
     Vec2 forward = Vec2::fromAngle (angle);
-    float targetSpeed = throttle * maxSpeed;
-    float currentSpeed = velocity.length();
+    float effectiveMaxSpeed = maxSpeed * damagePenalty;
+    float targetSpeed = throttle * effectiveMaxSpeed;
+
+    // Calculate current speed with sign (positive = forward, negative = backward)
+    float currentSpeed = velocity.dot (forward);
 
     // Gradually adjust speed toward target
-    if (throttle > 0)
+    if (throttle != 0)
     {
-        velocity = forward * std::min (currentSpeed + throttle * maxSpeed * 0.5f * dt, targetSpeed);
-    }
-    else if (throttle < 0)
-    {
-        velocity = forward * std::max (currentSpeed + throttle * maxSpeed * 0.5f * dt, targetSpeed);
+        float newSpeed = currentSpeed + (targetSpeed - currentSpeed) * 0.5f * dt;
+        velocity = forward * newSpeed;
     }
     else
     {
@@ -83,13 +87,14 @@ void Ship::update (float dt, Vec2 moveInput, Vec2 aimInput, bool fireInput, floa
         velocity *= 0.995f;
     }
 
-    // Apply rudder to turning (only when moving)
+    // Apply rudder to turning (only when moving, reduced by damage)
     float speed = velocity.length();
     if (speed > 0.5f)
     {
-        // Turn rate scales with speed - can't turn when stationary
-        float turnFactor = std::min (speed / maxSpeed, 1.0f);
-        angularVelocity = rudder * 1.5f * turnFactor;
+        // Turn rate based on minimum turning radius of 2x boat length
+        // radius = speed / angularVelocity, so angularVelocity = speed / radius
+        float minTurnRadius = length * 2.0f / damagePenalty; // Damaged ships turn wider
+        angularVelocity = rudder * speed / minTurnRadius;
     }
     else
     {
@@ -115,21 +120,29 @@ void Ship::update (float dt, Vec2 moveInput, Vec2 aimInput, bool fireInput, floa
     if (aimInput.lengthSquared() > 0.01f)
     {
         crosshairOffset += aimInput * crosshairSpeed * dt;
+    }
 
-        // Clamp distance from ship
-        float dist = crosshairOffset.length();
-        if (dist < minCrosshairDist)
-        {
-            crosshairOffset = crosshairOffset.normalized() * minCrosshairDist;
-        }
-        else if (dist > maxCrosshairDist)
-        {
-            crosshairOffset = crosshairOffset.normalized() * maxCrosshairDist;
-        }
+    // Clamp crosshair to stay on screen
+    Vec2 crosshairWorldPos = position + crosshairOffset;
+    float margin = 10.0f;
+    if (crosshairWorldPos.x < margin)
+        crosshairOffset.x = margin - position.x;
+    else if (crosshairWorldPos.x > arenaWidth - margin)
+        crosshairOffset.x = arenaWidth - margin - position.x;
+    if (crosshairWorldPos.y < margin)
+        crosshairOffset.y = margin - position.y;
+    else if (crosshairWorldPos.y > arenaHeight - margin)
+        crosshairOffset.y = arenaHeight - margin - position.y;
+
+    // Clamp crosshair to max range
+    float crosshairDist = crosshairOffset.length();
+    if (crosshairDist > maxCrosshairDist)
+    {
+        crosshairOffset = crosshairOffset.normalized() * maxCrosshairDist;
     }
 
     // Update turrets to aim at crosshair from their individual positions
-    Vec2 crosshairWorldPos = position + crosshairOffset;
+    crosshairWorldPos = position + crosshairOffset;
     float cosA = std::cos (angle);
     float sinA = std::sin (angle);
 
@@ -148,6 +161,9 @@ void Ship::update (float dt, Vec2 moveInput, Vec2 aimInput, bool fireInput, floa
 
     // Update bubble trail
     updateBubbles (dt);
+
+    // Update smoke
+    updateSmoke (dt, wind);
 }
 
 void Ship::clampToArena (float arenaWidth, float arenaHeight)
@@ -254,8 +270,9 @@ void Ship::fireShells()
 {
     float cosA = std::cos (angle);
     float sinA = std::sin (angle);
-    float targetRange = crosshairOffset.length();
-    float shellSpeed = maxSpeed * 2.0f; // Shells travel at 2x boat speed
+    // Use minimum range if crosshair is too close
+    float targetRange = std::max (crosshairOffset.length(), minShellRange);
+    float shellSpeed = maxSpeed * 5.0f; // Shells travel at 5x boat speed
 
     for (const auto& turret : turrets)
     {
@@ -284,6 +301,12 @@ bool Ship::isReadyToFire() const
 {
     // Check if reloaded
     if (fireTimer > 0)
+    {
+        return false;
+    }
+
+    // Check if crosshair is in valid range
+    if (! isCrosshairInRange())
     {
         return false;
     }
@@ -346,5 +369,69 @@ void Ship::updateBubbles (float dt)
 
             bubbles.push_back ({ spawnPos, bubbleRadius, 1.0f });
         }
+    }
+}
+
+void Ship::updateSmoke (float dt, Vec2 wind)
+{
+    float fadeTime = 3.0f; // Smoke fades over 3 seconds
+    float fadeRate = 1.0f / fadeTime;
+    float windStrength = 50.0f; // How much wind affects smoke
+
+    // Update existing smoke - fade and move with wind
+    for (auto it = smoke.begin(); it != smoke.end();)
+    {
+        it->alpha -= fadeRate * dt;
+        it->position += wind * windStrength * dt;
+
+        if (it->alpha <= 0.0f)
+        {
+            it = smoke.erase (it);
+        }
+        else
+        {
+            ++it;
+        }
+    }
+
+    // Spawn new smoke - all ships make some engine smoke, damaged ships make more
+    float damagePercent = getDamagePercent();
+    smokeSpawnTimer += dt;
+
+    // Base spawn interval for engine smoke, faster with damage
+    float baseSpawnInterval = 0.5f; // Undamaged ships: smoke every 0.5s
+    float spawnInterval = baseSpawnInterval / (1.0f + damagePercent * 4.0f);
+
+    while (smokeSpawnTimer >= spawnInterval)
+    {
+        smokeSpawnTimer -= spawnInterval;
+
+        // Spawn position depends on damage level
+        Vec2 spawnPos;
+        float cosA = std::cos (angle);
+        float sinA = std::sin (angle);
+
+        if (damagePercent < 0.3f)
+        {
+            // Light/no damage: smoke from engine (center)
+            spawnPos = position;
+        }
+        else
+        {
+            // Heavy damage: smoke from random locations across ship
+            float randomX = ((float) rand() / RAND_MAX - 0.5f) * length * 0.8f;
+            float randomY = ((float) rand() / RAND_MAX - 0.5f) * width * 0.6f;
+            spawnPos.x = position.x + randomX * cosA - randomY * sinA;
+            spawnPos.y = position.y + randomX * sinA + randomY * cosA;
+        }
+
+        // Smoke size: small wisps for undamaged, bigger with damage
+        float baseRadius = 1.5f + damagePercent * 2.0f;
+        float smokeRadius = baseRadius + ((float) rand() / RAND_MAX) * 1.5f;
+
+        // Lower starting alpha for thinner smoke
+        float startAlpha = 0.4f + damagePercent * 0.4f; // 0.4 to 0.8 based on damage
+
+        smoke.push_back ({ spawnPos, smokeRadius, startAlpha });
     }
 }

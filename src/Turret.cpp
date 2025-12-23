@@ -94,6 +94,49 @@ void Turret::update (float dt, float shipAngle, Vec2 targetDir)
     while (angleDiff < -M_PI)
         angleDiff += 2.0f * M_PI;
 
+    // Check if the short path is blocked by arc limits
+    // If so, go the long way around
+    float arcSize = M_PI * 0.75f; // 135 degrees
+
+    if (isFront)
+    {
+        // Front turrets: forbidden zone is beyond ±135° (the rear of the ship)
+        // If short path would cross the back, go through front (0) instead
+        bool angleInPositive = angle > 0;
+        bool targetInPositive = targetAngle > 0;
+        bool crossesBack = (angleInPositive != targetInPositive) && std::abs (angleDiff) > M_PI * 0.5f;
+
+        if (crossesBack)
+        {
+            // Go through center (0) instead of back
+            if (angle > 0)
+                angleDiff = -0.1f;
+            else
+                angleDiff = 0.1f;
+        }
+    }
+    else
+    {
+        // Rear turrets: forbidden zone is near 0 (the front of the ship)
+        // Can only aim from 45° to 180° and -180° to -45°
+        float limit = M_PI - arcSize; // 45 degrees
+
+        // If both angles are in the valid rear arc but on opposite sides,
+        // and the short path would cross through the forbidden front zone
+        bool angleNearLimit = std::abs (angle) < M_PI * 0.6f;
+        bool targetNearLimit = std::abs (targetAngle) < M_PI * 0.6f;
+        bool crossesFront = angleNearLimit && targetNearLimit && (angle * targetAngle < 0);
+
+        if (crossesFront)
+        {
+            // Go through back (±PI) instead of front
+            if (angle > 0)
+                angleDiff = 0.1f; // Rotate toward +PI
+            else
+                angleDiff = -0.1f; // Rotate toward -PI
+        }
+    }
+
     float maxRotation = rotationSpeed * dt;
     if (std::abs (angleDiff) < maxRotation)
     {
@@ -123,7 +166,7 @@ void Turret::setTargetAngle (float angle_)
     targetAngle = clampAngleToArc (angle_);
 }
 
-bool Turret::isOnTarget() const
+bool Turret::isAimedAtTarget() const
 {
     float angleDiff = targetAngle - angle;
     // Normalize to [-PI, PI]
@@ -133,18 +176,13 @@ bool Turret::isOnTarget() const
         angleDiff += 2.0f * M_PI;
 
     // Consider on target if within ~5 degrees
-    if (std::abs (angleDiff) < 0.09f)
-    {
-        return true;
-    }
+    return std::abs (angleDiff) < 0.09f;
+}
 
-    // Also on target if turret is at its arc limit (can't rotate further)
-    if (isAtArcLimit())
-    {
-        return true;
-    }
-
-    return false;
+bool Turret::isOnTarget() const
+{
+    // On target if actually aimed OR at arc limit (can't rotate further)
+    return isAimedAtTarget() || isAtArcLimit();
 }
 
 bool Turret::isAtArcLimit() const

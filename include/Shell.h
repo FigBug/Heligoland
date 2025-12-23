@@ -24,7 +24,7 @@ private:
     Vec2 velocity;
     int ownerIndex; // Which player fired this shell
     float radius = 3.0f;
-    float splashRadius = 20.0f; // Hit detection radius when shell lands
+    float splashRadius = 8.0f; // Hit detection radius when shell lands
     bool alive = true;
     bool landed = false; // True when shell reaches target range
     float targetRange = 150.0f; // Distance shell travels before landing

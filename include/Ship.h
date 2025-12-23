@@ -15,12 +15,19 @@ struct Bubble
     float alpha; // 0.0 to 1.0
 };
 
+struct Smoke
+{
+    Vec2 position;
+    float radius;
+    float alpha; // 0.0 to 1.0
+};
+
 class Ship
 {
 public:
     Ship (int playerIndex, Vec2 startPos, float startAngle);
 
-    void update (float dt, Vec2 moveInput, Vec2 aimInput, bool fireInput, float arenaWidth, float arenaHeight);
+    void update (float dt, Vec2 moveInput, Vec2 aimInput, bool fireInput, float arenaWidth, float arenaHeight, Vec2 wind);
 
     Vec2 getPosition() const { return position; }
     float getAngle() const { return angle; }
@@ -31,6 +38,8 @@ public:
     const std::array<Turret, 4>& getTurrets() const { return turrets; }
     Vec2 getCrosshairPosition() const { return position + crosshairOffset; }
     const std::vector<Bubble>& getBubbles() const { return bubbles; }
+    const std::vector<Smoke>& getSmoke() const { return smoke; }
+    float getDamagePercent() const { return 1.0f - (health / maxHealth); }
     std::vector<Shell>& getPendingShells() { return pendingShells; }
     SDL_Color getColor() const;
 
@@ -52,7 +61,8 @@ public:
     float getRudder() const { return rudder; }
     float getCrosshairDistance() const; // Distance from ship to crosshair
     float getReloadProgress() const { return 1.0f - (fireTimer / fireInterval); }
-    bool isReadyToFire() const; // True if reloaded AND turrets on target
+    bool isReadyToFire() const; // True if reloaded AND turrets on target AND in range
+    bool isCrosshairInRange() const { return crosshairOffset.length() >= minShellRange; }
 
 private:
     int playerIndex;
@@ -74,7 +84,7 @@ private:
 
     Vec2 crosshairOffset; // Offset from ship position (moves with aim stick)
     float crosshairSpeed = 150.0f; // How fast crosshair moves
-    float minCrosshairDist = 50.0f;
+    float minShellRange = 50.0f; // Minimum range shells can travel
     float maxCrosshairDist = 300.0f;
 
     std::array<Turret, 4> turrets;
@@ -82,6 +92,9 @@ private:
     std::vector<Bubble> bubbles;
     float bubbleSpawnTimer = 0.0f;
     float bubbleSpawnInterval = 0.02f;
+
+    std::vector<Smoke> smoke;
+    float smokeSpawnTimer = 0.0f;
 
     // Health
     float health = 1000.0f;
@@ -94,5 +107,6 @@ private:
 
     void clampToArena (float arenaWidth, float arenaHeight);
     void updateBubbles (float dt);
+    void updateSmoke (float dt, Vec2 wind);
     void fireShells();
 };
