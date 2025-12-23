@@ -1,10 +1,12 @@
 #include "Game.h"
 #include <SDL3/SDL_main.h>
 
-int main(int argc, char* argv[]) {
+int main (int argc, char* argv[])
+{
     Game game;
 
-    if (!game.init()) {
+    if (! game.init())
+    {
         return 1;
     }
 

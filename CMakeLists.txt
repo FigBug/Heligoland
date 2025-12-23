@@ -4,6 +4,9 @@ project(Heligoland VERSION 0.1.0 LANGUAGES CXX)
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
+# macOS deployment target
+set(CMAKE_OSX_DEPLOYMENT_TARGET "13.0" CACHE STRING "Minimum macOS version")
+
 # SDL3 options
 set(SDL_SHARED OFF CACHE BOOL "" FORCE)
 set(SDL_STATIC ON CACHE BOOL "" FORCE)
@@ -16,6 +19,7 @@ set(SOURCES
     src/Game.cpp
     src/Ship.cpp
     src/Turret.cpp
+    src/Shell.cpp
     src/Player.cpp
     src/AIController.cpp
     src/Renderer.cpp
@@ -25,6 +29,7 @@ set(HEADERS
     include/Game.h
     include/Ship.h
     include/Turret.h
+    include/Shell.h
     include/Player.h
     include/AIController.h
     include/Renderer.h
