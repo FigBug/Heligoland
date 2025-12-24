@@ -12,6 +12,7 @@ class Renderer
 {
 public:
     Renderer (SDL_Renderer* renderer);
+    ~Renderer();
 
     void clear();
     void drawWater (float time, float screenWidth, float screenHeight);
@@ -38,7 +39,10 @@ public:
 
 private:
     SDL_Renderer* renderer;
+    SDL_Texture* noiseTexture = nullptr;
+    int noiseTextureSize = 128;
 
+    void createNoiseTexture();
     void drawFilledOval (Vec2 center, float width, float height, float angle, SDL_Color color);
     void drawFilledCircle (Vec2 center, float radius, SDL_Color color);
     void drawShipHull (Vec2 center, float length, float width, float angle, SDL_Color color);

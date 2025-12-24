@@ -17,6 +17,12 @@ enum class GameState
     GameOver
 };
 
+enum class GameMode
+{
+    FFA,      // Free for all - every ship for themselves
+    Teams     // 2v2 - ships 0,1 vs ships 2,3
+};
+
 struct Explosion
 {
     Vec2 position;
@@ -53,7 +59,8 @@ private:
 
     bool running = false;
     GameState state = GameState::Title;
-    int winnerIndex = -1;
+    GameMode gameMode = GameMode::FFA;
+    int winnerIndex = -1;  // In FFA: player index, in Teams: team index (0 or 1)
     float gameOverTimer = 0.0f;
     float gameStartDelay = 0.0f; // Delay before accepting fire input after game starts
     float time = 0.0f; // Total elapsed time for animations
@@ -99,7 +106,10 @@ private:
 
     Vec2 getShipStartPosition (int index) const;
     float getShipStartAngle (int index) const;
+    int getTeam (int playerIndex) const;  // Returns 0 or 1 for team mode
+    bool areEnemies (int playerA, int playerB) const;
     void getWindowSize (float& width, float& height) const;
     void setupLogicalPresentation();
     void handleWindowResize();
+    void cycleGameMode (int direction);
 };

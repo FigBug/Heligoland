@@ -143,7 +143,46 @@ void Game::update (float dt)
 
 void Game::updateTitle (float dt)
 {
-    // Check if any button is pressed to start the game
+    // Check for mode switching with bumpers/triggers
+    static bool leftBumperWasPressed = false;
+    static bool rightBumperWasPressed = false;
+
+    bool leftBumperPressed = false;
+    bool rightBumperPressed = false;
+
+    for (auto& player : players)
+    {
+        if (player->isConnected())
+        {
+            // Get gamepad for this player (we need to check bumpers directly)
+            int numGamepads = 0;
+            SDL_JoystickID* gamepads = SDL_GetGamepads (&numGamepads);
+            if (gamepads && player->getPlayerIndex() < numGamepads)
+            {
+                SDL_Gamepad* gp = SDL_OpenGamepad (gamepads[player->getPlayerIndex()]);
+                if (gp)
+                {
+                    if (SDL_GetGamepadButton (gp, SDL_GAMEPAD_BUTTON_LEFT_SHOULDER))
+                        leftBumperPressed = true;
+                    if (SDL_GetGamepadButton (gp, SDL_GAMEPAD_BUTTON_RIGHT_SHOULDER))
+                        rightBumperPressed = true;
+                    SDL_CloseGamepad (gp);
+                }
+            }
+            SDL_free (gamepads);
+        }
+    }
+
+    // Cycle mode on bumper press (with edge detection)
+    if (leftBumperPressed && ! leftBumperWasPressed)
+        cycleGameMode (-1);
+    if (rightBumperPressed && ! rightBumperWasPressed)
+        cycleGameMode (1);
+
+    leftBumperWasPressed = leftBumperPressed;
+    rightBumperWasPressed = rightBumperPressed;
+
+    // Check if any face button is pressed to start the game
     if (anyButtonPressed())
     {
         startGame();
@@ -152,14 +191,27 @@ void Game::updateTitle (float dt)
 
 bool Game::anyButtonPressed()
 {
-    for (auto& player : players)
+    // Check for face buttons only (not bumpers, which are used for mode switching)
+    int numGamepads = 0;
+    SDL_JoystickID* gamepads = SDL_GetGamepads (&numGamepads);
+    if (! gamepads)
+        return false;
+
+    bool pressed = false;
+    for (int i = 0; i < numGamepads && ! pressed; ++i)
     {
-        if (player->isConnected() && player->getFireInput())
+        SDL_Gamepad* gp = SDL_OpenGamepad (gamepads[i]);
+        if (gp)
         {
-            return true;
+            pressed = SDL_GetGamepadButton (gp, SDL_GAMEPAD_BUTTON_SOUTH) ||
+                      SDL_GetGamepadButton (gp, SDL_GAMEPAD_BUTTON_EAST) ||
+                      SDL_GetGamepadButton (gp, SDL_GAMEPAD_BUTTON_WEST) ||
+                      SDL_GetGamepadButton (gp, SDL_GAMEPAD_BUTTON_NORTH);
+            SDL_CloseGamepad (gp);
         }
     }
-    return false;
+    SDL_free (gamepads);
+    return pressed;
 }
 
 void Game::startGame()
@@ -251,7 +303,8 @@ void Game::updatePlaying (float dt)
             float nearestDist = 999999.0f;
             for (int j = 0; j < NUM_SHIPS; ++j)
             {
-                if (i != j && ships[j] && ships[j]->isAlive())
+                // Only target enemies (in team mode, skip teammates)
+                if (areEnemies (i, j) && ships[j] && ships[j]->isAlive())
                 {
                     float dist = (ships[j]->getPosition() - ships[i]->getPosition()).length();
                     if (dist < nearestDist)
@@ -538,23 +591,58 @@ void Game::checkCollisions()
 
 void Game::checkGameOver()
 {
-    int aliveCount = 0;
-    int lastAlive = -1;
-
-    for (int i = 0; i < NUM_SHIPS; ++i)
+    if (gameMode == GameMode::Teams)
     {
-        if (ships[i] && ships[i]->isAlive())
+        // Count alive ships per team
+        int team0Alive = 0;
+        int team1Alive = 0;
+
+        for (int i = 0; i < NUM_SHIPS; ++i)
         {
-            aliveCount++;
-            lastAlive = i;
+            if (ships[i] && ships[i]->isAlive())
+            {
+                if (getTeam (i) == 0)
+                    team0Alive++;
+                else
+                    team1Alive++;
+            }
+        }
+
+        // Game ends when one team is eliminated
+        if (team0Alive == 0 || team1Alive == 0)
+        {
+            if (team0Alive == 0 && team1Alive == 0)
+                winnerIndex = -1;  // Draw
+            else if (team0Alive > 0)
+                winnerIndex = 0;   // Team 1 wins (index 0)
+            else
+                winnerIndex = 1;   // Team 2 wins (index 1)
+
+            gameOverTimer = 0.0f;
+            state = GameState::GameOver;
         }
     }
-
-    if (aliveCount <= 1)
+    else
     {
-        winnerIndex = lastAlive;
-        gameOverTimer = 0.0f;
-        state = GameState::GameOver;
+        // FFA mode - last ship standing wins
+        int aliveCount = 0;
+        int lastAlive = -1;
+
+        for (int i = 0; i < NUM_SHIPS; ++i)
+        {
+            if (ships[i] && ships[i]->isAlive())
+            {
+                aliveCount++;
+                lastAlive = i;
+            }
+        }
+
+        if (aliveCount <= 1)
+        {
+            winnerIndex = lastAlive;
+            gameOverTimer = 0.0f;
+            state = GameState::GameOver;
+        }
     }
 }
 
@@ -602,10 +690,18 @@ void Game::renderTitle()
     }
 
     std::string playerText = std::to_string (connectedCount) + " PLAYERS CONNECTED";
-    renderer->drawTextCentered (playerText, { w / 2.0f, h / 2.0f }, 3.0f, subtitleColor);
+    renderer->drawTextCentered (playerText, { w / 2.0f, h * 0.45f }, 3.0f, subtitleColor);
+
+    // Draw game mode selector
+    SDL_Color modeColor = { 255, 220, 100, 255 };
+    std::string modeText = gameMode == GameMode::FFA ? "FREE FOR ALL" : "2 VS 2";
+    renderer->drawTextCentered (modeText, { w / 2.0f, h * 0.55f }, 4.0f, modeColor);
+
+    SDL_Color modeHintColor = { 120, 120, 120, 255 };
+    renderer->drawTextCentered ("LB - RB TO CHANGE MODE", { w / 2.0f, h * 0.62f }, 1.5f, modeHintColor);
 
     // Draw player slots
-    float slotY = h * 0.6f;
+    float slotY = h * 0.72f;
     float slotSpacing = 80.0f;
     float startX = w / 2.0f - (NUM_SHIPS - 1) * slotSpacing / 2.0f;
 
@@ -648,7 +744,7 @@ void Game::renderTitle()
 
     // Draw start instruction
     SDL_Color instructColor = { 150, 150, 150, 255 };
-    renderer->drawTextCentered ("PRESS ANY BUTTON TO START", { w / 2.0f, h * 0.85f }, 2.0f, instructColor);
+    renderer->drawTextCentered ("PRESS ANY BUTTON TO START", { w / 2.0f, h * 0.90f }, 2.0f, instructColor);
 }
 
 void Game::renderPlaying()
@@ -761,7 +857,12 @@ void Game::renderGameOver()
 
     if (winnerIndex >= 0)
     {
-        std::string winText = "PLAYER " + std::to_string (winnerIndex + 1) + " WINS!";
+        std::string winText;
+        if (gameMode == GameMode::Teams)
+            winText = "TEAM " + std::to_string (winnerIndex + 1) + " WINS!";
+        else
+            winText = "PLAYER " + std::to_string (winnerIndex + 1) + " WINS!";
+
         renderer->drawTextCentered (winText, { w / 2.0f, h / 2.0f }, 5.0f, textColor);
     }
     else
@@ -775,12 +876,33 @@ Vec2 Game::getShipStartPosition (int index) const
     float w, h;
     getWindowSize (w, h);
 
-    // Place ships in a circle around the center, equidistant from each other
-    Vec2 center = { w / 2.0f, h / 2.0f };
-    float radius = std::min (w, h) * 0.35f; // 35% of smaller dimension
+    if (gameMode == GameMode::Teams)
+    {
+        // 2v2 mode: teams on left and right sides
+        float margin = w * 0.15f;
+        float verticalSpacing = h * 0.25f;
 
-    // Start at top and go clockwise
-    float angleOffset = -pi / 2.0f; // Start at top
+        if (index < 2)
+        {
+            // Team 0 (players 0, 1) on left
+            float x = margin;
+            float y = h / 2.0f + (index == 0 ? -verticalSpacing : verticalSpacing);
+            return { x, y };
+        }
+        else
+        {
+            // Team 1 (players 2, 3) on right
+            float x = w - margin;
+            float y = h / 2.0f + (index == 2 ? -verticalSpacing : verticalSpacing);
+            return { x, y };
+        }
+    }
+
+    // FFA mode: Place ships in a circle around the center
+    Vec2 center = { w / 2.0f, h / 2.0f };
+    float radius = std::min (w, h) * 0.35f;
+
+    float angleOffset = -pi / 2.0f;
     float angle = angleOffset + (index * 2.0f * pi / NUM_SHIPS);
 
     return center + Vec2::fromAngle (angle) * radius;
@@ -788,10 +910,19 @@ Vec2 Game::getShipStartPosition (int index) const
 
 float Game::getShipStartAngle (int index) const
 {
-    // Point ships toward center (opposite of their position angle)
-    float angleOffset = -pi / 2.0f; // Start at top
+    if (gameMode == GameMode::Teams)
+    {
+        // 2v2 mode: teams face each other
+        if (index < 2)
+            return 0.0f;  // Team 0 faces right
+        else
+            return pi;    // Team 1 faces left
+    }
+
+    // FFA mode: Point ships toward center
+    float angleOffset = -pi / 2.0f;
     float posAngle = angleOffset + (index * 2.0f * pi / NUM_SHIPS);
-    return posAngle + pi; // Point toward center
+    return posAngle + pi;
 }
 
 void Game::getWindowSize (float& width, float& height) const
@@ -804,18 +935,50 @@ void Game::getWindowSize (float& width, float& height) const
 
 void Game::setupLogicalPresentation()
 {
-    // Get window size in points (logical pixels)
-    int windowWidth, windowHeight;
-    SDL_GetWindowSize (window, &windowWidth, &windowHeight);
+    // Get logical size (points) and physical size (pixels)
+    int logicalW, logicalH;
+    int pixelW, pixelH;
+    SDL_GetWindowSize (window, &logicalW, &logicalH);
+    SDL_GetWindowSizeInPixels (window, &pixelW, &pixelH);
 
-    // Set logical presentation so rendering uses logical coordinates
-    // SDL will automatically scale to physical pixels on high DPI displays
-    SDL_SetRenderLogicalPresentation (sdlRenderer, windowWidth, windowHeight,
-                                      SDL_LOGICAL_PRESENTATION_LETTERBOX);
+    // Calculate scale for HiDPI displays
+    float scaleX = (float) pixelW / logicalW;
+    float scaleY = (float) pixelH / logicalH;
+
+    SDL_SetRenderScale (sdlRenderer, scaleX, scaleY);
 }
 
 void Game::handleWindowResize()
 {
     // Update logical presentation when window is resized
     setupLogicalPresentation();
+}
+
+int Game::getTeam (int playerIndex) const
+{
+    // Team 0: players 0, 1 (left side)
+    // Team 1: players 2, 3 (right side)
+    return playerIndex < 2 ? 0 : 1;
+}
+
+bool Game::areEnemies (int playerA, int playerB) const
+{
+    if (gameMode == GameMode::FFA)
+        return playerA != playerB;  // Everyone is an enemy in FFA
+
+    return getTeam (playerA) != getTeam (playerB);
+}
+
+void Game::cycleGameMode (int direction)
+{
+    int mode = static_cast<int> (gameMode);
+    mode += direction;
+
+    // Wrap around
+    if (mode < 0)
+        mode = 1;
+    else if (mode > 1)
+        mode = 0;
+
+    gameMode = static_cast<GameMode> (mode);
 }

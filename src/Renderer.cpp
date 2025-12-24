@@ -8,6 +8,72 @@
 Renderer::Renderer (SDL_Renderer* renderer_)
     : renderer (renderer_)
 {
+    createNoiseTexture();
+}
+
+Renderer::~Renderer()
+{
+    if (noiseTexture)
+    {
+        SDL_DestroyTexture (noiseTexture);
+        noiseTexture = nullptr;
+    }
+}
+
+void Renderer::createNoiseTexture()
+{
+    // Create a simple noise texture using a basic hash function
+    // Uses 2-3 shades of highlight for a subtle water effect
+    noiseTexture = SDL_CreateTexture (renderer, SDL_PIXELFORMAT_RGBA8888,
+                                      SDL_TEXTUREACCESS_STATIC,
+                                      noiseTextureSize, noiseTextureSize);
+    if (! noiseTexture)
+        return;
+
+    SDL_SetTextureBlendMode (noiseTexture, SDL_BLENDMODE_BLEND);
+
+    std::vector<uint32_t> pixels (noiseTextureSize * noiseTextureSize);
+
+    for (int y = 0; y < noiseTextureSize; ++y)
+    {
+        for (int x = 0; x < noiseTextureSize; ++x)
+        {
+            // Simple hash-based noise
+            unsigned int hash = x * 374761393 + y * 668265263;
+            hash = (hash ^ (hash >> 13)) * 1274126177;
+            hash = hash ^ (hash >> 16);
+
+            int noise = hash % 100;
+
+            // Most pixels transparent, occasional highlights
+            uint8_t alpha = 0;
+            uint8_t brightness = 255;
+
+            if (noise < 8)
+            {
+                // Bright highlight (8% of pixels)
+                alpha = 25;
+                brightness = 255;
+            }
+            else if (noise < 20)
+            {
+                // Medium highlight (12% of pixels)
+                alpha = 15;
+                brightness = 200;
+            }
+            else if (noise < 35)
+            {
+                // Subtle highlight (15% of pixels)
+                alpha = 8;
+                brightness = 180;
+            }
+
+            // RGBA8888 format
+            pixels[y * noiseTextureSize + x] = (brightness << 24) | (brightness << 16) | (brightness << 8) | alpha;
+        }
+    }
+
+    SDL_UpdateTexture (noiseTexture, nullptr, pixels.data(), noiseTextureSize * sizeof (uint32_t));
 }
 
 void Renderer::clear()
@@ -16,10 +82,65 @@ void Renderer::clear()
     SDL_RenderClear (renderer);
 }
 
-void Renderer::drawWater (float, float, float)
+void Renderer::drawWater (float time, float screenWidth, float screenHeight)
 {
+    // Base ocean color
     SDL_SetRenderDrawColor (renderer, 30, 60, 90, 255);
     SDL_RenderClear (renderer);
+
+    if (! noiseTexture)
+        return;
+
+    // Calculate tile size (scale noise texture up for visibility)
+    float tileSize = (float) noiseTextureSize * 2.0f;
+
+    // Layer 1: Primary scroll direction (slow, diagonal)
+    float scroll1X = time * 8.0f;  // pixels per second
+    float scroll1Y = time * 5.0f;
+
+    // Layer 2: Secondary scroll (different direction, slightly faster)
+    float scroll2X = time * -6.0f;
+    float scroll2Y = time * 9.0f;
+
+    // Calculate how many tiles we need to cover the screen plus wrap margin
+    int tilesX = (int) (screenWidth / tileSize) + 2;
+    int tilesY = (int) (screenHeight / tileSize) + 2;
+
+    // Draw first noise layer
+    float offsetX1 = std::fmod (scroll1X, tileSize);
+    float offsetY1 = std::fmod (scroll1Y, tileSize);
+
+    for (int ty = -1; ty < tilesY; ++ty)
+    {
+        for (int tx = -1; tx < tilesX; ++tx)
+        {
+            SDL_FRect destRect = {
+                tx * tileSize - offsetX1,
+                ty * tileSize - offsetY1,
+                tileSize,
+                tileSize
+            };
+            SDL_RenderTexture (renderer, noiseTexture, nullptr, &destRect);
+        }
+    }
+
+    // Draw second noise layer (offset and different scroll)
+    float offsetX2 = std::fmod (scroll2X, tileSize);
+    float offsetY2 = std::fmod (scroll2Y, tileSize);
+
+    for (int ty = -1; ty < tilesY; ++ty)
+    {
+        for (int tx = -1; tx < tilesX; ++tx)
+        {
+            SDL_FRect destRect = {
+                tx * tileSize - offsetX2 + tileSize * 0.5f,
+                ty * tileSize - offsetY2 + tileSize * 0.5f,
+                tileSize,
+                tileSize
+            };
+            SDL_RenderTexture (renderer, noiseTexture, nullptr, &destRect);
+        }
+    }
 }
 
 void Renderer::present()
