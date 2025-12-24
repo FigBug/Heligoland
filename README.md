@@ -1,6 +1,8 @@
 # Heligoland
 
-A 4-player naval combat game built with SDL3 and C++.
+A 4-player naval combat game built with raylib and C++.
+
+![Screenshot](screenshots/screenshot1.png)
 
 ![Build macOS](https://github.com/FigBug/Heligoland/actions/workflows/build_macos.yml/badge.svg)
 ![Build Windows](https://github.com/FigBug/Heligoland/actions/workflows/build_windows.yml/badge.svg)
@@ -47,7 +49,7 @@ Ships without a connected gamepad are controlled by AI.
 
 - CMake 3.16 or higher
 - C++17 compatible compiler
-- SDL3 (included as submodule)
+- raylib (included as submodule)
 
 ### Clone
 
@@ -83,7 +85,7 @@ cmake --build build
 
 ## Dependencies
 
-- SDL3 (included as submodule in `modules/SDL`)
+- raylib (included as submodule in `modules/raylib`)
 
 ## License
 
