@@ -92,6 +92,8 @@ jobs:
     permissions:
       contents: write
     steps:
+      - uses: actions/checkout@v4
+
       - name: Download all artifacts
         uses: actions/download-artifact@v4
         with:
@@ -100,6 +102,17 @@ jobs:
       - name: List artifacts
         run: find artifacts -type f
 
+      - name: Extract release notes
+        id: release_notes
+        run: |
+          VERSION=$(cat VERSION | tr -d '[:space:]')
+          # Extract notes for current version (from version line to next version or EOF)
+          NOTES=$(awk "/^$VERSION\$/{found=1; next} /^[0-9]+\.[0-9]+\.[0-9]+\$/{if(found) exit} found{print}" Changelist.txt)
+          # Use delimiter for multiline output
+          echo "notes<<EOF" >> $GITHUB_OUTPUT
+          echo "$NOTES" >> $GITHUB_OUTPUT
+          echo "EOF" >> $GITHUB_OUTPUT
+
       - name: Create Release
         uses: softprops/action-gh-release@v1
         with:
@@ -107,4 +120,4 @@ jobs:
             artifacts/macOS/*
             artifacts/Windows/*
             artifacts/Linux/*
-          generate_release_notes: true
+          body: ${{ steps.release_notes.outputs.notes }}

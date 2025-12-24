@@ -8,6 +8,13 @@ if [ -z "$VERSION" ]; then
     exit 1
 fi
 
+# Check if version is in Changelist.txt
+if ! grep -q "^$VERSION$" Changelist.txt; then
+    echo "Error: Version $VERSION not found in Changelist.txt"
+    echo "Please add an entry for this version before tagging"
+    exit 1
+fi
+
 TAG="v$VERSION"
 
 echo "Creating tag: $TAG"

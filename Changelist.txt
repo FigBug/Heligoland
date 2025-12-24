@@ -1,0 +1,22 @@
+0.0.5
+- Added 2v2 game mode
+- Switched from SDL to Raylib
+- Added high scores
+- Added installers
+- Improved AI aiming
+
+0.0.4
+
+- Trying to get build process to work
+
+0.0.3
+
+- Trying to get build process to work
+
+0.0.2
+
+- Trying to get build process to work
+
+0.0.1
+
+- Initial code
