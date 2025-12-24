@@ -23,7 +23,7 @@ jobs:
             build_cmd: |
               cmake -B build -G "Visual Studio 17 2022" -A x64
               cmake --build build --config Release
-              Compress-Archive -Path build/Release/Heligoland.exe -DestinationPath build/Heligoland-Windows.zip
+              cd build/Release && 7z a ../Heligoland-Windows.zip Heligoland.exe
           - os: ubuntu-latest
             name: Linux
             artifact: Heligoland-Linux.zip
