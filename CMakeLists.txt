@@ -1,16 +1,21 @@
 cmake_minimum_required(VERSION 3.16)
+
+# macOS deployment target and universal binary - must be set before project()
+set(CMAKE_OSX_DEPLOYMENT_TARGET "13.0" CACHE STRING "Minimum macOS version")
+set(CMAKE_OSX_ARCHITECTURES "arm64;x86_64" CACHE STRING "Build universal binary")
+
 project(Heligoland VERSION 0.1.0 LANGUAGES CXX)
 
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
-# macOS deployment target
-set(CMAKE_OSX_DEPLOYMENT_TARGET "13.0" CACHE STRING "Minimum macOS version")
-
 # SDL3 options
 set(SDL_SHARED OFF CACHE BOOL "" FORCE)
 set(SDL_STATIC ON CACHE BOOL "" FORCE)
 set(SDL_TEST OFF CACHE BOOL "" FORCE)
+
+# Disable XTEST (causes issues on GitHub Actions Linux)
+set(SDL_X11_XTEST OFF CACHE BOOL "" FORCE)
 
 add_subdirectory(modules/SDL)
 
