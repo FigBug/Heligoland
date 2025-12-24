@@ -48,25 +48,6 @@ jobs:
         env:
           DEV_ID: ${{ secrets.DEV_ID }}
 
-      - name: Notarize Application
-        run: |
-          cd build
-          zip -r Heligoland.zip Heligoland.app
-
-          xcrun notarytool submit \
-            --apple-id "$APPLE_USER" \
-            --password "$APPLE_PASS" \
-            --team-id "$TEAM_ID" \
-            --wait --timeout 30m \
-            Heligoland.zip
-
-          xcrun stapler staple Heligoland.app
-          rm Heligoland.zip
-        env:
-          APPLE_USER: ${{ secrets.APPLE_USER }}
-          APPLE_PASS: ${{ secrets.APPLE_PASS }}
-          TEAM_ID: ${{ secrets.TEAM_ID }}
-
       - name: Create Installer
         run: cd build && cpack -G productbuild
 
@@ -78,6 +59,24 @@ jobs:
           mv "signed-$PKG_FILE" "$PKG_FILE"
         env:
           INSTALLER_ID: ${{ secrets.INSTALLER_ID }}
+
+      - name: Notarize Installer
+        run: |
+          cd build
+          PKG_FILE=$(ls Heligoland-*.pkg)
+
+          xcrun notarytool submit \
+            --apple-id "$APPLE_USER" \
+            --password "$APPLE_PASS" \
+            --team-id "$TEAM_ID" \
+            --wait --timeout 30m \
+            "$PKG_FILE"
+
+          xcrun stapler staple "$PKG_FILE"
+        env:
+          APPLE_USER: ${{ secrets.APPLE_USER }}
+          APPLE_PASS: ${{ secrets.APPLE_PASS }}
+          TEAM_ID: ${{ secrets.TEAM_ID }}
 
       - name: Upload artifact
         uses: actions/upload-artifact@v4
