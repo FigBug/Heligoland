@@ -35,8 +35,7 @@ jobs:
         run: cmake --build build --config Release
 
       - name: Create Installer
-        run: |
-          cd build && cpack -G DEB
+        run: installer/linux/build_deb.sh
 
       - name: Upload Artifact
         uses: actions/upload-artifact@v4

@@ -2,6 +2,7 @@
 #include <raylib.h>
 #include <algorithm>
 #include <cmath>
+#include <vector>
 
 Game::Game() = default;
 
@@ -171,7 +172,8 @@ void Game::startGame()
 {
     // Create ships at starting positions
     bool isTeamMode = (gameMode == GameMode::Teams);
-    for (int i = 0; i < NUM_SHIPS; ++i)
+    int numShips = getNumShipsForMode();
+    for (int i = 0; i < numShips; ++i)
     {
         ships[i] = std::make_unique<Ship> (i, getShipStartPosition (i), getShipStartAngle (i), isTeamMode);
     }
@@ -232,7 +234,8 @@ void Game::updatePlaying (float dt)
     updateWind (dt);
 
     // Update ships
-    for (int i = 0; i < NUM_SHIPS; ++i)
+    int numShips = getNumShipsForMode();
+    for (int i = 0; i < numShips; ++i)
     {
         if (! ships[i] || ! ships[i]->isAlive())
         {
@@ -251,24 +254,17 @@ void Game::updatePlaying (float dt)
         }
         else
         {
-            // Find nearest living enemy ship for AI targeting
-            const Ship* target = nullptr;
-            float nearestDist = 999999.0f;
-            for (int j = 0; j < NUM_SHIPS; ++j)
+            // Find all living enemy ships for AI
+            std::vector<const Ship*> enemies;
+            for (int j = 0; j < numShips; ++j)
             {
-                // Only target enemies that are alive and not sinking
                 if (areEnemies (i, j) && ships[j] && ships[j]->isAlive() && ! ships[j]->isSinking())
                 {
-                    float dist = (ships[j]->getPosition() - ships[i]->getPosition()).length();
-                    if (dist < nearestDist)
-                    {
-                        nearestDist = dist;
-                        target = ships[j].get();
-                    }
+                    enemies.push_back (ships[j].get());
                 }
             }
 
-            aiControllers[i]->update (dt, *ships[i], target, arenaWidth, arenaHeight);
+            aiControllers[i]->update (dt, *ships[i], enemies, arenaWidth, arenaHeight);
             moveInput = aiControllers[i]->getMoveInput();
             aimInput = aiControllers[i]->getAimInput();
             fireInput = aiControllers[i]->getFireInput();
@@ -301,7 +297,7 @@ void Game::updatePlaying (float dt)
     {
         float totalThrottle = 0.0f;
         int aliveCount = 0;
-        for (int i = 0; i < NUM_SHIPS; ++i)
+        for (int i = 0; i < numShips; ++i)
         {
             if (ships[i] && ships[i]->isAlive())
             {
@@ -339,7 +335,8 @@ void Game::updateGameOver (float dt)
     getWindowSize (arenaWidth, arenaHeight);
 
     // Keep updating ships (for smoke effects)
-    for (int i = 0; i < NUM_SHIPS; ++i)
+    int numShips = getNumShipsForMode();
+    for (int i = 0; i < numShips; ++i)
     {
         if (ships[i] && ships[i]->isAlive())
         {
@@ -422,7 +419,7 @@ void Game::checkCollisions()
 
         for (auto& ship : ships)
         {
-            if (! ship->isAlive())
+            if (! ship || ! ship->isAlive())
                 continue;
             if (ship->getPlayerIndex() == shell.getOwnerIndex())
                 continue; // Don't hit own ship
@@ -491,14 +488,15 @@ void Game::checkCollisions()
     }
 
     // Ship-to-ship collisions using OBB (Separating Axis Theorem)
-    for (int i = 0; i < NUM_SHIPS; ++i)
+    int numShips = getNumShipsForMode();
+    for (int i = 0; i < numShips; ++i)
     {
-        if (! ships[i]->isAlive())
+        if (! ships[i] || ! ships[i]->isAlive())
             continue;
 
-        for (int j = i + 1; j < NUM_SHIPS; ++j)
+        for (int j = i + 1; j < numShips; ++j)
         {
-            if (! ships[j]->isAlive())
+            if (! ships[j] || ! ships[j]->isAlive())
                 continue;
 
             // Get corners of both ships
@@ -642,11 +640,12 @@ void Game::checkGameOver()
     }
     else
     {
-        // FFA mode - last ship standing wins
+        // FFA and Duel modes - last ship standing wins
         int aliveCount = 0;
         int lastAlive = -1;
+        int numShips = getNumShipsForMode();
 
-        for (int i = 0; i < NUM_SHIPS; ++i)
+        for (int i = 0; i < numShips; ++i)
         {
             if (canFight (i))
             {
@@ -718,17 +717,24 @@ void Game::renderTitle()
     renderer->drawTextCentered (playerText, { w / 2.0f, h * 0.45f }, 3.0f, Config::colorSubtitle);
 
     // Draw game mode selector
-    std::string modeText = gameMode == GameMode::FFA ? "FREE FOR ALL" : "2 VS 2";
+    std::string modeText;
+    if (gameMode == GameMode::FFA)
+        modeText = "FREE FOR ALL";
+    else if (gameMode == GameMode::Teams)
+        modeText = "2 VS 2";
+    else
+        modeText = "1 VS 1";
     renderer->drawTextCentered (modeText, { w / 2.0f, h * 0.55f }, 4.0f, Config::colorModeText);
 
     renderer->drawTextCentered ("LEFT - RIGHT TO CHANGE MODE", { w / 2.0f, h * 0.62f }, 1.5f, Config::colorGreySubtle);
 
-    // Draw player slots
+    // Draw player slots (only show slots for current mode)
+    int numSlots = getNumShipsForMode();
     float slotY = h * 0.72f;
     float slotSpacing = 80.0f;
-    float startX = w / 2.0f - (NUM_SHIPS - 1) * slotSpacing / 2.0f;
+    float startX = w / 2.0f - (numSlots - 1) * slotSpacing / 2.0f;
 
-    for (int i = 0; i < NUM_SHIPS; ++i)
+    for (int i = 0; i < numSlots; ++i)
     {
         Vec2 slotPos = { startX + i * slotSpacing, slotY };
         Color slotColor;
@@ -823,16 +829,18 @@ void Game::renderPlaying()
     }
 
     // Draw HUD for each ship
+    int numShips = getNumShipsForMode();
     float hudWidth = 200.0f;
     float hudHeight = 50.0f;
     float hudSpacing = 20.0f;
-    float hudTotalWidth = NUM_SHIPS * hudWidth + (NUM_SHIPS - 1) * hudSpacing;
+    float hudTotalWidth = numShips * hudWidth + (numShips - 1) * hudSpacing;
     float hudStartX = (w - hudTotalWidth) / 2.0f;
     float hudY = 10.0f;
 
     int slot = 0;
-    for (const auto& ship : ships)
+    for (int i = 0; i < numShips; ++i)
     {
+        const auto& ship = ships[i];
         if (ship && ship->isAlive() && ! ship->isSinking())
         {
             // Check if any ship is under this HUD panel
@@ -855,7 +863,7 @@ void Game::renderPlaying()
                 }
             }
 
-            renderer->drawShipHUD (*ship, slot, NUM_SHIPS, w, alpha);
+            renderer->drawShipHUD (*ship, slot, numShips, w, alpha);
         }
         slot++;
     }
@@ -900,6 +908,12 @@ void Game::renderGameOver()
                                 "  -  TEAM 2: " + std::to_string (teamWins[1]);
         renderer->drawTextCentered (statsText, { w / 2.0f, h / 2.0f + 40.0f }, 2.5f, statsColor);
     }
+    else if (gameMode == GameMode::Duel)
+    {
+        std::string statsText = "P1: " + std::to_string (playerWins[0]) +
+                                "  -  P2: " + std::to_string (playerWins[1]);
+        renderer->drawTextCentered (statsText, { w / 2.0f, h / 2.0f + 40.0f }, 2.5f, statsColor);
+    }
     else
     {
         std::string statsText = "P1: " + std::to_string (playerWins[0]) +
@@ -914,6 +928,16 @@ Vec2 Game::getShipStartPosition (int index) const
 {
     float w, h;
     getWindowSize (w, h);
+
+    if (gameMode == GameMode::Duel)
+    {
+        // 1v1 mode: ships on left and right, centered vertically
+        float margin = w * 0.15f;
+        if (index == 0)
+            return { margin, h / 2.0f };
+        else
+            return { w - margin, h / 2.0f };
+    }
 
     if (gameMode == GameMode::Teams)
     {
@@ -949,6 +973,15 @@ Vec2 Game::getShipStartPosition (int index) const
 
 float Game::getShipStartAngle (int index) const
 {
+    if (gameMode == GameMode::Duel)
+    {
+        // 1v1 mode: ships face each other
+        if (index == 0)
+            return 0.0f;  // Player 1 faces right
+        else
+            return pi;    // Player 2 faces left
+    }
+
     if (gameMode == GameMode::Teams)
     {
         // 2v2 mode: teams face each other
@@ -979,8 +1012,8 @@ int Game::getTeam (int playerIndex) const
 
 bool Game::areEnemies (int playerA, int playerB) const
 {
-    if (gameMode == GameMode::FFA)
-        return playerA != playerB;  // Everyone is an enemy in FFA
+    if (gameMode == GameMode::FFA || gameMode == GameMode::Duel)
+        return playerA != playerB;  // Everyone is an enemy in FFA and Duel
 
     return getTeam (playerA) != getTeam (playerB);
 }
@@ -990,11 +1023,18 @@ void Game::cycleGameMode (int direction)
     int mode = static_cast<int> (gameMode);
     mode += direction;
 
-    // Wrap around
+    // Wrap around (3 modes: FFA, Teams, Duel)
     if (mode < 0)
-        mode = 1;
-    else if (mode > 1)
+        mode = 2;
+    else if (mode > 2)
         mode = 0;
 
     gameMode = static_cast<GameMode> (mode);
+}
+
+int Game::getNumShipsForMode() const
+{
+    if (gameMode == GameMode::Duel)
+        return 2;
+    return NUM_SHIPS;  // 4 for FFA and Teams
 }

@@ -177,11 +177,14 @@ namespace Config
     // -------------------------------------------------------------------------
     // Colors - Gameplay
     // -------------------------------------------------------------------------
-    static constexpr Color colorShell                  = { 255, 200, 50, 255 };
+    static constexpr Color colorShell                  = { 255, 60, 40, 255 };
+    static constexpr float shellTrailLength            = 20.0f;
+    static constexpr int shellTrailSegments            = 5;
     static constexpr Color colorBubble                 = { 255, 255, 255, 128 };
     static constexpr Color colorBarrel                 = { 50, 50, 50, 255 };
     static constexpr Color colorReloadReady            = { 100, 255, 100, 255 };
     static constexpr Color colorReloadNotReady         = { 255, 100, 100, 255 };
+    static constexpr Color colorFiringRange            = { 255, 255, 255, 5 }; 
     static constexpr Color colorThrottleBar            = { 100, 150, 255, 255 };
     static constexpr Color colorRudderBar              = { 255, 200, 100, 255 };
 

@@ -21,7 +21,8 @@ enum class GameState
 enum class GameMode
 {
     FFA,      // Free for all - every ship for themselves
-    Teams     // 2v2 - ships 0,1 vs ships 2,3
+    Teams,    // 2v2 - ships 0,1 vs ships 2,3
+    Duel      // 1v1 - ship 0 vs ship 1
 };
 
 struct Explosion
@@ -108,4 +109,5 @@ private:
     bool areEnemies (int playerA, int playerB) const;
     void getWindowSize (float& width, float& height) const;
     void cycleGameMode (int direction);
+    int getNumShipsForMode() const;  // Returns number of ships for current game mode
 };

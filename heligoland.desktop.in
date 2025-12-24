@@ -1,8 +1,0 @@
-[Desktop Entry]
-Type=Application
-Name=Heligoland
-Comment=A naval combat game
-Exec=heligoland
-Icon=heligoland
-Terminal=false
-Categories=Game;ActionGame;

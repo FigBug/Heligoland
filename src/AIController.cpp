@@ -10,125 +10,198 @@ AIController::AIController()
     wanderTarget = { 0, 0 };
 }
 
-void AIController::update (float dt, Ship& myShip, const Ship* targetShip, float arenaWidth, float arenaHeight)
+void AIController::update (float dt, Ship& myShip, const std::vector<const Ship*>& enemies, float arenaWidth, float arenaHeight)
 {
-    updateWander (dt, myShip, arenaWidth, arenaHeight);
-    updateAim (myShip, targetShip);
+    currentMode = determineMode (myShip, enemies);
+    const Ship* target = findTarget (myShip, enemies);
+
+    updateMovement (dt, myShip, enemies, arenaWidth, arenaHeight);
+    updateAim (myShip, target);
 }
 
-void AIController::updateWander (float dt, const Ship& myShip, float arenaWidth, float arenaHeight)
+AIMode AIController::determineMode (const Ship& myShip, const std::vector<const Ship*>& enemies)
 {
-    wanderTimer -= dt;
+    float myHealth = myShip.getHealth();
+    float myMaxHealth = myShip.getMaxHealth();
+    float myHealthPercent = myHealth / myMaxHealth;
 
-    if (wanderTimer <= 0.0f)
+    // Scared mode: health below 25%
+    if (myHealthPercent < 0.25f)
+        return AIMode::Scared;
+
+    // Check if any enemy has much less health (below 30% of my health)
+    for (const Ship* enemy : enemies)
     {
-        // Pick a new random target within the arena
-        float margin = Config::aiWanderMargin;
-        wanderTarget.x = margin + (rand() / (float) RAND_MAX) * (arenaWidth - 2 * margin);
-        wanderTarget.y = margin + (rand() / (float) RAND_MAX) * (arenaHeight - 2 * margin);
-        wanderTimer = wanderInterval + (rand() / (float) RAND_MAX) * 2.0f;
+        float enemyHealthPercent = enemy->getHealth() / enemy->getMaxHealth();
+        if (enemyHealthPercent < myHealthPercent * 0.5f)
+            return AIMode::Aggressive;
     }
 
-    Vec2 pos = myShip.getPosition();
+    return AIMode::Normal;
+}
+
+const Ship* AIController::findTarget (const Ship& myShip, const std::vector<const Ship*>& enemies)
+{
+    if (enemies.empty())
+        return nullptr;
+
+    Vec2 myPos = myShip.getPosition();
+
+    // In aggressive mode, target the weakest enemy
+    if (currentMode == AIMode::Aggressive)
+    {
+        const Ship* weakest = nullptr;
+        float lowestHealth = 999999.0f;
+        for (const Ship* enemy : enemies)
+        {
+            if (enemy->getHealth() < lowestHealth)
+            {
+                lowestHealth = enemy->getHealth();
+                weakest = enemy;
+            }
+        }
+        return weakest;
+    }
+
+    // Otherwise target the nearest enemy
+    const Ship* nearest = nullptr;
+    float nearestDist = 999999.0f;
+    for (const Ship* enemy : enemies)
+    {
+        float dist = (enemy->getPosition() - myPos).length();
+        if (dist < nearestDist)
+        {
+            nearestDist = dist;
+            nearest = enemy;
+        }
+    }
+    return nearest;
+}
+
+void AIController::updateMovement (float dt, const Ship& myShip, const std::vector<const Ship*>& enemies, float arenaWidth, float arenaHeight)
+{
+    Vec2 myPos = myShip.getPosition();
     Vec2 vel = myShip.getVelocity();
     float speed = myShip.getSpeed();
     float shipAngle = myShip.getAngle();
     float shipLength = myShip.getLength();
 
-    // Look ahead based on speed - predict where we'll be
-    float lookAheadTime = Config::aiLookAheadTime;
-    Vec2 futurePos = pos + vel * lookAheadTime;
-
-    // Calculate danger margin - larger when moving faster
-    float dangerMargin = shipLength * 2.0f + speed * 1.5f;
-
-    // Check for edge danger
-    bool edgeDangerLeft = futurePos.x < dangerMargin;
-    bool edgeDangerRight = futurePos.x > arenaWidth - dangerMargin;
-    bool edgeDangerTop = futurePos.y < dangerMargin;
-    bool edgeDangerBottom = futurePos.y > arenaHeight - dangerMargin;
-    bool edgeDanger = edgeDangerLeft || edgeDangerRight || edgeDangerTop || edgeDangerBottom;
-
-    // Check if already hit something (stopped but throttle applied)
+    // Check if crashed into edge
     float margin = shipLength;
-    bool nearEdge = pos.x < margin || pos.x > arenaWidth - margin ||
-                    pos.y < margin || pos.y > arenaHeight - margin;
+    bool nearEdge = myPos.x < margin || myPos.x > arenaWidth - margin ||
+                    myPos.y < margin || myPos.y > arenaHeight - margin;
     bool stopped = speed < 0.5f && std::abs (myShip.getThrottle()) > 0.1f;
 
     if (nearEdge || stopped)
     {
         // Already crashed - reverse and turn away
-        moveInput.y = 0.5f; // Positive Y is reverse
-        moveInput.x = (rand() % 2 == 0) ? 1.0f : -1.0f; // Random turn direction
-
-        // Pick a new target toward center
+        moveInput.y = 0.5f;
+        moveInput.x = (rand() % 2 == 0) ? 1.0f : -1.0f;
         wanderTarget = { arenaWidth / 2.0f, arenaHeight / 2.0f };
         wanderTimer = 2.0f;
         return;
     }
 
-    if (edgeDanger && speed > 2.0f)
+    Vec2 desiredDir = { 0, 0 };
+    float desiredSpeed = 0.5f;
+
+    if (enemies.empty())
     {
-        // Approaching edge - steer away proactively
-        Vec2 avoidDir = { 0, 0 };
-
-        if (edgeDangerLeft)
-            avoidDir.x += 1.0f;
-        if (edgeDangerRight)
-            avoidDir.x -= 1.0f;
-        if (edgeDangerTop)
-            avoidDir.y += 1.0f;
-        if (edgeDangerBottom)
-            avoidDir.y -= 1.0f;
-
-        if (avoidDir.lengthSquared() > 0.01f)
+        // No enemies - just wander
+        wanderTimer -= dt;
+        if (wanderTimer <= 0.0f)
         {
-            avoidDir = avoidDir.normalized();
-            float avoidAngle = avoidDir.toAngle();
-            float angleDiff = avoidAngle - shipAngle;
-
-            // Normalize to [-PI, PI]
-            while (angleDiff > pi)
-                angleDiff -= 2.0f * pi;
-            while (angleDiff < -pi)
-                angleDiff += 2.0f * pi;
-
-            // Strong turn to avoid
-            moveInput.x = std::clamp (angleDiff * 3.0f, -1.0f, 1.0f);
-
-            // Slow down if heading toward danger
-            float dotProduct = vel.normalized().dot (avoidDir * -1.0f);
-            if (dotProduct > 0.3f)
+            float wanderMargin = Config::aiWanderMargin;
+            wanderTarget.x = wanderMargin + (rand() / (float) RAND_MAX) * (arenaWidth - 2 * wanderMargin);
+            wanderTarget.y = wanderMargin + (rand() / (float) RAND_MAX) * (arenaHeight - 2 * wanderMargin);
+            wanderTimer = wanderInterval + (rand() / (float) RAND_MAX) * 2.0f;
+        }
+        desiredDir = (wanderTarget - myPos).normalized();
+    }
+    else if (currentMode == AIMode::Scared)
+    {
+        // Run away from all enemies
+        Vec2 fleeDir = { 0, 0 };
+        for (const Ship* enemy : enemies)
+        {
+            Vec2 awayFromEnemy = myPos - enemy->getPosition();
+            float dist = awayFromEnemy.length();
+            if (dist > 0.01f)
             {
-                moveInput.y = 0.3f; // Slow down / slight reverse
+                // Weight by inverse distance - flee more urgently from closer enemies
+                fleeDir = fleeDir + awayFromEnemy.normalized() * (1.0f / (dist + 1.0f));
+            }
+        }
+        if (fleeDir.lengthSquared() > 0.01f)
+            desiredDir = fleeDir.normalized();
+        desiredSpeed = 1.0f; // Full speed escape
+    }
+    else if (currentMode == AIMode::Aggressive)
+    {
+        // Move toward the weakest enemy
+        const Ship* target = findTarget (myShip, enemies);
+        if (target)
+        {
+            Vec2 toTarget = target->getPosition() - myPos;
+            float dist = toTarget.length();
+
+            // Get close but not too close (stay at half firing range)
+            float idealDist = Config::maxCrosshairDistance * 0.5f;
+            if (dist > idealDist)
+            {
+                desiredDir = toTarget.normalized();
+                desiredSpeed = 0.7f;
             }
             else
             {
-                moveInput.y = -0.3f; // Keep moving but slower
+                // Circle around target at ideal distance
+                Vec2 perpendicular = { -toTarget.y, toTarget.x };
+                desiredDir = perpendicular.normalized();
+                desiredSpeed = 0.4f;
             }
+        }
+    }
+    else // Normal mode
+    {
+        // Stay at edge of firing range from nearest enemy
+        const Ship* nearest = findTarget (myShip, enemies);
+        if (nearest)
+        {
+            Vec2 toEnemy = nearest->getPosition() - myPos;
+            float dist = toEnemy.length();
 
-            // Update wander target to safe area
-            wanderTarget = { arenaWidth / 2.0f, arenaHeight / 2.0f };
-            wanderTimer = 1.0f;
-            return;
+            // Ideal distance is just inside max firing range
+            float idealDist = Config::maxCrosshairDistance * 0.85f;
+            float tolerance = 30.0f;
+
+            if (dist < idealDist - tolerance)
+            {
+                // Too close - back away
+                desiredDir = toEnemy.normalized() * -1.0f;
+                desiredSpeed = 0.5f;
+            }
+            else if (dist > idealDist + tolerance)
+            {
+                // Too far - move closer
+                desiredDir = toEnemy.normalized();
+                desiredSpeed = 0.5f;
+            }
+            else
+            {
+                // Good distance - circle around to get better angle
+                Vec2 perpendicular = { -toEnemy.y, toEnemy.x };
+                desiredDir = perpendicular.normalized();
+                desiredSpeed = 0.3f;
+            }
         }
     }
 
-    // Move toward wander target
-    Vec2 toTarget = wanderTarget - pos;
-    float distance = toTarget.length();
+    // Apply edge avoidance
+    avoidEdges (myShip, arenaWidth, arenaHeight, desiredDir);
 
-    if (distance < 50.0f)
+    // Convert desired direction to steering input
+    if (desiredDir.lengthSquared() > 0.01f)
     {
-        // Close enough, slow down
-        moveInput = { 0, 0 };
-    }
-    else
-    {
-        // Calculate desired direction
-        Vec2 desiredDir = toTarget.normalized();
-
-        // Calculate angle to target
         float targetAngle = desiredDir.toAngle();
         float angleDiff = targetAngle - shipAngle;
 
@@ -144,13 +217,78 @@ void AIController::updateWander (float dt, const Ship& myShip, float arenaWidth,
         // Move forward if roughly facing target
         if (std::abs (angleDiff) < pi * 0.5f)
         {
-            moveInput.y = -0.5f; // Negative Y is forward
+            moveInput.y = -desiredSpeed; // Negative Y is forward
+        }
+        else if (std::abs (angleDiff) > pi * 0.75f)
+        {
+            // Facing away - reverse a bit while turning
+            moveInput.y = 0.2f;
         }
         else
         {
             moveInput.y = 0.0f;
         }
     }
+    else
+    {
+        moveInput = { 0, 0 };
+    }
+}
+
+void AIController::avoidEdges (const Ship& myShip, float arenaWidth, float arenaHeight, Vec2& desiredDir)
+{
+    Vec2 pos = myShip.getPosition();
+    Vec2 vel = myShip.getVelocity();
+    float speed = myShip.getSpeed();
+    float shipLength = myShip.getLength();
+
+    // Look ahead based on speed
+    float lookAheadTime = Config::aiLookAheadTime;
+    Vec2 futurePos = pos + vel * lookAheadTime;
+
+    float dangerMargin = shipLength * 2.0f + speed * 1.5f;
+
+    Vec2 avoidDir = { 0, 0 };
+    float urgency = 0.0f;
+
+    if (futurePos.x < dangerMargin)
+    {
+        avoidDir.x += 1.0f;
+        urgency = std::max (urgency, 1.0f - futurePos.x / dangerMargin);
+    }
+    if (futurePos.x > arenaWidth - dangerMargin)
+    {
+        avoidDir.x -= 1.0f;
+        urgency = std::max (urgency, 1.0f - (arenaWidth - futurePos.x) / dangerMargin);
+    }
+    if (futurePos.y < dangerMargin)
+    {
+        avoidDir.y += 1.0f;
+        urgency = std::max (urgency, 1.0f - futurePos.y / dangerMargin);
+    }
+    if (futurePos.y > arenaHeight - dangerMargin)
+    {
+        avoidDir.y -= 1.0f;
+        urgency = std::max (urgency, 1.0f - (arenaHeight - futurePos.y) / dangerMargin);
+    }
+
+    if (avoidDir.lengthSquared() > 0.01f)
+    {
+        avoidDir = avoidDir.normalized();
+        // Blend avoid direction with desired direction based on urgency
+        urgency = std::clamp (urgency * 2.0f, 0.0f, 1.0f);
+        desiredDir = desiredDir * (1.0f - urgency) + avoidDir * urgency;
+        if (desiredDir.lengthSquared() > 0.01f)
+            desiredDir = desiredDir.normalized();
+    }
+}
+
+bool AIController::isNearEdge (const Ship& myShip, float arenaWidth, float arenaHeight)
+{
+    Vec2 pos = myShip.getPosition();
+    float margin = Config::aiWanderMargin;
+    return pos.x < margin || pos.x > arenaWidth - margin ||
+           pos.y < margin || pos.y > arenaHeight - margin;
 }
 
 void AIController::updateAim (const Ship& myShip, const Ship* targetShip)
@@ -162,7 +300,7 @@ void AIController::updateAim (const Ship& myShip, const Ship* targetShip)
         Vec2 targetVel = targetShip->getVelocity();
 
         // Calculate shell speed (same formula as Ship::fireShells)
-        float shellSpeed = myShip.getMaxSpeed() * 5.0f;
+        float shellSpeed = myShip.getMaxSpeed() * Config::shellSpeedMultiplier;
 
         // Calculate distance to target
         Vec2 toTarget = targetPos - myPos;
@@ -174,7 +312,6 @@ void AIController::updateAim (const Ship& myShip, const Ship* targetShip)
             float flightTime = distance / shellSpeed;
 
             // Predict where target will be when shell arrives
-            // Use iterative refinement for better accuracy
             Vec2 predictedPos = targetPos + targetVel * flightTime;
 
             // Refine prediction: recalculate with new distance
@@ -182,7 +319,7 @@ void AIController::updateAim (const Ship& myShip, const Ship* targetShip)
             flightTime = newDistance / shellSpeed;
             predictedPos = targetPos + targetVel * flightTime;
 
-            // Calculate where crosshair should be (at predicted position)
+            // Calculate where crosshair should be
             Vec2 desiredCrosshairPos = predictedPos;
             Vec2 currentCrosshairPos = myShip.getCrosshairPosition();
 
@@ -192,7 +329,6 @@ void AIController::updateAim (const Ship& myShip, const Ship* targetShip)
 
             if (crosshairDist > 5.0f)
             {
-                // Move crosshair toward predicted position
                 aimInput = crosshairDiff.normalized();
             }
             else
@@ -200,8 +336,10 @@ void AIController::updateAim (const Ship& myShip, const Ship* targetShip)
                 aimInput = { 0, 0 };
             }
 
-            // Fire if crosshair is close to predicted position and ship is ready
-            fireInput = crosshairDist < Config::aiCrosshairTolerance && distance < Config::aiFireDistance && myShip.isReadyToFire();
+            // Fire if crosshair is close to predicted position and in range
+            fireInput = crosshairDist < Config::aiCrosshairTolerance &&
+                        distance < Config::aiFireDistance &&
+                        myShip.isReadyToFire();
         }
         else
         {
@@ -211,7 +349,6 @@ void AIController::updateAim (const Ship& myShip, const Ship* targetShip)
     }
     else
     {
-        // No target, don't move crosshair and don't fire
         aimInput = { 0, 0 };
         fireInput = false;
     }

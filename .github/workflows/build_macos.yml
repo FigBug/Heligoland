@@ -24,7 +24,7 @@ jobs:
           security import /tmp/Application.p12 -t agg -k build.keychain -P "$CERT_PASS" -A -T /usr/bin/codesign
 
           echo "$INSTALLER" | base64 -D -o /tmp/Installer.p12
-          security import /tmp/Installer.p12 -t agg -k build.keychain -P "$CERT_PASS" -A -T /usr/bin/productbuild -T /usr/bin/productsign
+          security import /tmp/Installer.p12 -t agg -k build.keychain -P "$CERT_PASS" -A -T /usr/bin/pkgbuild -T /usr/bin/productbuild -T /usr/bin/productsign
 
           security set-key-partition-list -S apple-tool:,apple: -s -k "$KEYCHAIN_PASS" build.keychain
         env:
@@ -49,21 +49,40 @@ jobs:
           DEV_ID: ${{ secrets.DEV_ID }}
 
       - name: Create Installer
-        run: cd build && cpack -G productbuild
+        run: |
+          VERSION=$(cat VERSION | tr -d '[:space:]')
+
+          # Create component package
+          pkgbuild \
+            --root build/Heligoland.app \
+            --install-location "/Applications/Heligoland.app" \
+            --identifier "com.heligoland.game" \
+            --version "$VERSION" \
+            build/Heligoland-component.pkg
+
+          # Create product archive
+          productbuild \
+            --package build/Heligoland-component.pkg \
+            --identifier "com.heligoland.game.pkg" \
+            --version "$VERSION" \
+            build/Heligoland-unsigned.pkg
+
+          rm build/Heligoland-component.pkg
 
       - name: Sign Installer
         run: |
-          cd build
-          PKG_FILE=$(ls Heligoland-*.pkg)
-          productsign --sign "$INSTALLER_ID" "$PKG_FILE" "signed-$PKG_FILE"
-          mv "signed-$PKG_FILE" "$PKG_FILE"
+          VERSION=$(cat VERSION | tr -d '[:space:]')
+          productsign --sign "$INSTALLER_ID" \
+            build/Heligoland-unsigned.pkg \
+            "build/Heligoland-${VERSION}.pkg"
+          rm build/Heligoland-unsigned.pkg
         env:
           INSTALLER_ID: ${{ secrets.INSTALLER_ID }}
 
       - name: Notarize Installer
         run: |
-          cd build
-          PKG_FILE=$(ls Heligoland-*.pkg)
+          VERSION=$(cat VERSION | tr -d '[:space:]')
+          PKG_FILE="build/Heligoland-${VERSION}.pkg"
 
           xcrun notarytool submit \
             --apple-id "$APPLE_USER" \

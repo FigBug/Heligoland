@@ -87,6 +87,12 @@ void Renderer::drawShip (const Ship& ship)
     float angle = ship.getAngle();
     Color color = ship.getColor();
 
+    // Draw firing range circle (very faint white) - only for non-sinking ships
+    if (! ship.isSinking())
+    {
+        drawFilledCircle (pos, Config::maxCrosshairDistance, Config::colorFiringRange);
+    }
+
     // Calculate alpha for sinking ships
     float alpha = 1.0f;
     if (ship.isSinking())
@@ -158,7 +164,36 @@ void Renderer::drawSmoke (const Ship& ship)
 
 void Renderer::drawShell (const Shell& shell)
 {
-    drawFilledCircle (shell.getPosition(), shell.getRadius(), Config::colorShell);
+    Vec2 pos = shell.getPosition();
+    Vec2 vel = shell.getVelocity();
+    float radius = shell.getRadius();
+
+    // Draw gradient trail behind the shell
+    if (vel.length() > 0.1f)
+    {
+        Vec2 trailDir = vel.normalized() * -1.0f; // Opposite to velocity
+
+        for (int i = Config::shellTrailSegments; i >= 1; --i)
+        {
+            float t = (float) i / Config::shellTrailSegments;
+            Vec2 trailPos = pos + trailDir * (Config::shellTrailLength * t);
+
+            // Fade alpha and shrink radius along trail
+            float alpha = (1.0f - t) * 0.6f;
+            float trailRadius = radius * (1.0f - t * 0.5f);
+
+            Color trailColor = {
+                Config::colorShell.r,
+                Config::colorShell.g,
+                Config::colorShell.b,
+                (unsigned char) (255 * alpha)
+            };
+            drawFilledCircle (trailPos, trailRadius, trailColor);
+        }
+    }
+
+    // Draw the shell itself
+    drawFilledCircle (pos, radius, Config::colorShell);
 }
 
 void Renderer::drawExplosion (const Explosion& explosion)

@@ -19,14 +19,14 @@ jobs:
       - name: Build
         run: cmake --build build --config Release
 
-      - name: Install NSIS
-        run: choco install nsis -y
+      - name: Install Inno Setup
+        run: choco install innosetup -y
 
       - name: Create Installer
         run: |
-          cd build
-          cpack -G NSIS -C Release
-        shell: bash
+          $version = Get-Content VERSION -Raw
+          $version = $version.Trim()
+          & "C:\Program Files (x86)\Inno Setup 6\ISCC.exe" /DMyAppVersion=$version installer\windows\heligoland.iss
 
       - name: Upload Artifact
         uses: actions/upload-artifact@v4
