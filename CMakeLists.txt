@@ -123,12 +123,13 @@ if(APPLE)
     # macOS: Create .pkg installer
     set(CPACK_GENERATOR "productbuild")
     set(CPACK_PRODUCTBUILD_IDENTIFIER "com.heligoland.game")
-
-    # Signing is handled separately in CI with productsign
-    # Install the app bundle to /Applications
-    install(TARGETS ${PROJECT_NAME} BUNDLE DESTINATION "." COMPONENT Runtime)
-
     set(CPACK_PACKAGING_INSTALL_PREFIX "/Applications")
+
+    # Install the app bundle to /Applications
+    install(DIRECTORY "${CMAKE_BINARY_DIR}/${PROJECT_NAME}.app"
+            DESTINATION "."
+            USE_SOURCE_PERMISSIONS
+            COMPONENT Runtime)
 
 elseif(WIN32)
     # Windows: Create NSIS installer (.exe)
@@ -138,13 +139,13 @@ elseif(WIN32)
     set(CPACK_NSIS_INSTALL_ROOT "$PROGRAMFILES64")
     set(CPACK_NSIS_ENABLE_UNINSTALL_BEFORE_INSTALL ON)
     set(CPACK_NSIS_CREATE_ICONS_EXTRA
-        "CreateShortCut '$SMPROGRAMS\\\\$STARTMENU_FOLDER\\\\Heligoland.lnk' '$INSTDIR\\\\bin\\\\Heligoland.exe'")
+        "CreateShortCut '$SMPROGRAMS\\\\$STARTMENU_FOLDER\\\\Heligoland.lnk' '$INSTDIR\\\\Heligoland.exe'")
     set(CPACK_NSIS_DELETE_ICONS_EXTRA
         "Delete '$SMPROGRAMS\\\\$START_MENU\\\\Heligoland.lnk'")
 
-    # Install executable and assets
-    install(TARGETS ${PROJECT_NAME} RUNTIME DESTINATION bin COMPONENT Runtime)
-    install(DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/assets DESTINATION bin COMPONENT Runtime)
+    # Install executable and assets to root of install directory
+    install(TARGETS ${PROJECT_NAME} RUNTIME DESTINATION "." COMPONENT Runtime)
+    install(DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/assets DESTINATION "." COMPONENT Runtime)
 
 else()
     # Linux: Create .deb package
