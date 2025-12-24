@@ -17,8 +17,10 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(BUILD_EXAMPLES OFF CACHE BOOL "" FORCE)
 set(BUILD_GAMES OFF CACHE BOOL "" FORCE)
 set(BUILD_SHARED_LIBS OFF CACHE BOOL "" FORCE)
+set(GLFW_INSTALL OFF CACHE BOOL "" FORCE)
 
-add_subdirectory(modules/raylib)
+# Add raylib but exclude from install targets
+add_subdirectory(modules/raylib EXCLUDE_FROM_ALL)
 
 set(SOURCES
     src/main.cpp
