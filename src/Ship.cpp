@@ -20,13 +20,16 @@ void Ship::update (float dt, Vec2 moveInput, Vec2 aimInput, bool fireInput, floa
     if (sinking)
     {
         sinkTimer += dt;
+        if (sinkTimer > sinkDuration)
+            sinkTimer = sinkDuration; // Cap to prevent alpha wraparound
 
         // Slow down while sinking
         velocity *= 0.98f;
         angularVelocity *= 0.95f;
 
-        // Still update smoke (more smoke while sinking)
+        // Still update smoke and bubbles while sinking
         updateSmoke (dt, wind);
+        updateBubbles (dt);
         return; // Don't process any other input while sinking
     }
 
@@ -483,12 +486,18 @@ void Ship::updateSmoke (float dt, Vec2 wind)
     }
 
     // Spawn new smoke - all ships make some engine smoke, damaged ships make more
+    // Sinking ships produce less and less smoke
     float damagePercent = getDamagePercent();
+    float sinkFactor = sinking ? (1.0f - getSinkProgress()) : 1.0f;
+
+    if (sinkFactor <= 0.0f)
+        return; // No more smoke when fully sunk
+
     smokeSpawnTimer += dt;
 
     // Base spawn interval for engine smoke, faster with damage
     float baseSpawnInterval = 0.0333f; // Undamaged ships: smoke every ~33ms
-    float spawnInterval = baseSpawnInterval / (1.0f + damagePercent * 4.0f);
+    float spawnInterval = baseSpawnInterval / ((1.0f + damagePercent * 4.0f) * sinkFactor);
 
     while (smokeSpawnTimer >= spawnInterval)
     {
@@ -517,8 +526,8 @@ void Ship::updateSmoke (float dt, Vec2 wind)
         float baseRadius = 1.5f + damagePercent * 2.0f;
         float smokeRadius = baseRadius + ((float) rand() / RAND_MAX) * 1.5f;
 
-        // Lower starting alpha for thinner smoke
-        float startAlpha = 0.4f + damagePercent * 0.4f; // 0.4 to 0.8 based on damage
+        // Lower starting alpha for thinner smoke, reduce further when sinking
+        float startAlpha = (0.4f + damagePercent * 0.4f) * sinkFactor; // 0.4 to 0.8 based on damage
 
         // Random wind angle offset +/- 3 degrees (0.052 radians)
         float windAngleOffset = ((float) rand() / RAND_MAX - 0.5f) * 0.105f;

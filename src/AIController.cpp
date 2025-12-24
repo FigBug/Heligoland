@@ -156,23 +156,42 @@ void AIController::updateAim (const Ship& myShip, const Ship* targetShip)
 {
     if (targetShip)
     {
-        // Aim at the target ship
-        Vec2 toTarget = targetShip->getPosition() - myShip.getPosition();
+        Vec2 myPos = myShip.getPosition();
+        Vec2 targetPos = targetShip->getPosition();
+        Vec2 targetVel = targetShip->getVelocity();
+
+        // Calculate shell speed (same formula as Ship::fireShells)
+        float shellSpeed = myShip.getMaxSpeed() * 5.0f;
+
+        // Calculate distance to target
+        Vec2 toTarget = targetPos - myPos;
         float distance = toTarget.length();
 
         if (distance > 0.01f)
         {
-            // Calculate where crosshair should be (at target position)
-            Vec2 desiredCrosshairPos = targetShip->getPosition();
+            // Calculate flight time based on distance
+            float flightTime = distance / shellSpeed;
+
+            // Predict where target will be when shell arrives
+            // Use iterative refinement for better accuracy
+            Vec2 predictedPos = targetPos + targetVel * flightTime;
+
+            // Refine prediction: recalculate with new distance
+            float newDistance = (predictedPos - myPos).length();
+            flightTime = newDistance / shellSpeed;
+            predictedPos = targetPos + targetVel * flightTime;
+
+            // Calculate where crosshair should be (at predicted position)
+            Vec2 desiredCrosshairPos = predictedPos;
             Vec2 currentCrosshairPos = myShip.getCrosshairPosition();
 
-            // Move crosshair toward target
+            // Move crosshair toward predicted target position
             Vec2 crosshairDiff = desiredCrosshairPos - currentCrosshairPos;
             float crosshairDist = crosshairDiff.length();
 
             if (crosshairDist > 5.0f)
             {
-                // Move crosshair toward target position
+                // Move crosshair toward predicted position
                 aimInput = crosshairDiff.normalized();
             }
             else
@@ -180,7 +199,7 @@ void AIController::updateAim (const Ship& myShip, const Ship* targetShip)
                 aimInput = { 0, 0 };
             }
 
-            // Fire if crosshair is close to target and ship is ready
+            // Fire if crosshair is close to predicted position and ship is ready
             fireInput = crosshairDist < 30.0f && distance < 400.0f && myShip.isReadyToFire();
         }
         else

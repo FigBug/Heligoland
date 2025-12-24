@@ -143,10 +143,14 @@ void Renderer::drawBubbleTrail (const Ship& ship)
 
 void Renderer::drawSmoke (const Ship& ship)
 {
+    // Smoke darkens as ship sinks (from grey 40 to near-black 10)
+    float sinkProgress = ship.getSinkProgress();
+    unsigned char greyValue = (unsigned char) (40 - sinkProgress * 30); // 40 -> 10
+
     for (const auto& s : ship.getSmoke())
     {
         unsigned char alpha = (unsigned char) (s.alpha * 180);
-        Color color = { 40, 40, 40, alpha };
+        Color color = { greyValue, greyValue, greyValue, alpha };
         drawFilledCircle (s.position, s.radius, color);
     }
 }

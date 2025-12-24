@@ -964,10 +964,10 @@ float Game::getShipStartAngle (int index) const
             return pi;    // Team 1 faces left
     }
 
-    // FFA mode: Point ships toward center
+    // FFA mode: Point ships 90 degrees from center (tangent to circle)
     float angleOffset = -pi / 2.0f;
     float posAngle = angleOffset + (index * 2.0f * pi / NUM_SHIPS);
-    return posAngle + pi;
+    return posAngle + pi + (pi / 2.0f);
 }
 
 void Game::getWindowSize (float& width, float& height) const
