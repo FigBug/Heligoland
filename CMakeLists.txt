@@ -126,7 +126,8 @@ if(APPLE)
     set(CPACK_PACKAGING_INSTALL_PREFIX "/Applications")
 
     # Install the app bundle to /Applications
-    install(DIRECTORY "${CMAKE_BINARY_DIR}/${PROJECT_NAME}.app"
+    # Use generator expression to handle both single-config (Makefiles) and multi-config (Xcode) generators
+    install(DIRECTORY "$<TARGET_BUNDLE_DIR:${PROJECT_NAME}>"
             DESTINATION "."
             USE_SOURCE_PERMISSIONS
             COMPONENT Runtime)
