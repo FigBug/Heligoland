@@ -7,8 +7,6 @@ jobs:
   build:
     name: Build macOS
     runs-on: macos-latest
-    env:
-      HAS_SIGNING: ${{ secrets.DEV_ID != '' }}
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -16,7 +14,6 @@ jobs:
           submodules: recursive
 
       - name: Setup Keychain
-        if: env.HAS_SIGNING == 'true'
         run: |
           security create-keychain -p "$KEYCHAIN_PASS" build.keychain
           security default-keychain -s build.keychain
@@ -43,7 +40,6 @@ jobs:
         run: cmake --build build --config Release
 
       - name: Sign Application
-        if: env.HAS_SIGNING == 'true'
         run: |
           codesign --deep --force --verify --verbose --timestamp \
             --options runtime \
@@ -53,7 +49,6 @@ jobs:
           DEV_ID: ${{ secrets.DEV_ID }}
 
       - name: Notarize Application
-        if: env.HAS_SIGNING == 'true'
         run: |
           cd build
           zip -r Heligoland.zip Heligoland.app
@@ -73,11 +68,9 @@ jobs:
           TEAM_ID: ${{ secrets.TEAM_ID }}
 
       - name: Create Installer
-        run: |
-          cd build && cpack -G productbuild
+        run: cd build && cpack -G productbuild
 
       - name: Sign Installer
-        if: env.HAS_SIGNING == 'true'
         run: |
           cd build
           PKG_FILE=$(ls Heligoland-*.pkg)

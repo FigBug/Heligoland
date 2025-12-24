@@ -16,23 +16,68 @@ jobs:
 
       - name: Setup Keychain
         env:
+          APPLICATION: ${{ secrets.APPLICATION }}
           INSTALLER: ${{ secrets.INSTALLER }}
           CERT_PASS: ${{ secrets.CERT_PASS }}
+          KEYCHAIN_PASS: ${{ secrets.KEYCHAIN_PASS }}
         run: |
-          security create-keychain -p "" build.keychain
+          security create-keychain -p "$KEYCHAIN_PASS" build.keychain
           security default-keychain -s build.keychain
-          security unlock-keychain -p "" build.keychain
-          security set-keychain-settings -t 3600 -u build.keychain
-          echo "$INSTALLER" | base64 -D -o /tmp/Installer.p12
-          security import /tmp/Installer.p12 -t agg -k build.keychain -P "$CERT_PASS" -A -T /usr/bin/productbuild
-          security set-key-partition-list -S apple-tool:,apple: -s -k "" build.keychain
-          rm /tmp/Installer.p12
+          security unlock-keychain -p "$KEYCHAIN_PASS" build.keychain
+          security set-keychain-settings -l -u -t 13600 build.keychain
 
-      - name: Build and Package
+          echo "$APPLICATION" | base64 -D -o /tmp/Application.p12
+          security import /tmp/Application.p12 -t agg -k build.keychain -P "$CERT_PASS" -A -T /usr/bin/codesign
+
+          echo "$INSTALLER" | base64 -D -o /tmp/Installer.p12
+          security import /tmp/Installer.p12 -t agg -k build.keychain -P "$CERT_PASS" -A -T /usr/bin/productbuild -T /usr/bin/productsign
+
+          security set-key-partition-list -S apple-tool:,apple: -s -k "$KEYCHAIN_PASS" build.keychain
+
+      - name: Build
         run: |
           cmake -B build -DCMAKE_BUILD_TYPE=Release
           cmake --build build --config Release
-          cd build && cpack -G productbuild
+
+      - name: Sign Application
+        run: |
+          codesign --deep --force --verify --verbose --timestamp \
+            --options runtime \
+            --sign "$DEV_ID" \
+            build/Heligoland.app
+        env:
+          DEV_ID: ${{ secrets.DEV_ID }}
+
+      - name: Notarize Application
+        run: |
+          cd build
+          zip -r Heligoland.zip Heligoland.app
+
+          xcrun notarytool submit \
+            --apple-id "$APPLE_USER" \
+            --password "$APPLE_PASS" \
+            --team-id "$TEAM_ID" \
+            --wait --timeout 30m \
+            Heligoland.zip
+
+          xcrun stapler staple Heligoland.app
+          rm Heligoland.zip
+        env:
+          APPLE_USER: ${{ secrets.APPLE_USER }}
+          APPLE_PASS: ${{ secrets.APPLE_PASS }}
+          TEAM_ID: ${{ secrets.TEAM_ID }}
+
+      - name: Create Installer
+        run: cd build && cpack -G productbuild
+
+      - name: Sign Installer
+        run: |
+          cd build
+          PKG_FILE=$(ls Heligoland-*.pkg)
+          productsign --sign "$INSTALLER_ID" "$PKG_FILE" "signed-$PKG_FILE"
+          mv "signed-$PKG_FILE" "$PKG_FILE"
+        env:
+          INSTALLER_ID: ${{ secrets.INSTALLER_ID }}
 
       - name: Upload artifact
         uses: actions/upload-artifact@v4
