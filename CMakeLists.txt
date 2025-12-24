@@ -37,16 +37,18 @@ if(WIN32)
 endif()
 
 set(HEADERS
-    include/Game.h
-    include/Ship.h
-    include/Turret.h
-    include/Shell.h
-    include/Player.h
-    include/AIController.h
-    include/Renderer.h
-    include/Audio.h
-    include/Vec2.h
+    src/Game.h
+    src/Ship.h
+    src/Turret.h
+    src/Shell.h
+    src/Player.h
+    src/AIController.h
+    src/Renderer.h
+    src/Audio.h
+    src/Vec2.h
 )
+
+source_group("Source Files" FILES ${SOURCES} ${HEADERS})
 
 if(APPLE)
     set(ICON_FILE ${CMAKE_CURRENT_SOURCE_DIR}/icon.icns)
@@ -67,7 +69,7 @@ else()
 endif()
 
 target_include_directories(${PROJECT_NAME} PRIVATE
-    ${CMAKE_CURRENT_SOURCE_DIR}/include
+    ${CMAKE_CURRENT_SOURCE_DIR}/src
 )
 
 target_link_libraries(${PROJECT_NAME} PRIVATE raylib)
