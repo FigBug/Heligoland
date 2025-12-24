@@ -14,7 +14,7 @@ bool Game::init()
         return false;
     }
 
-    window = SDL_CreateWindow ("Heligoland", WINDOW_WIDTH, WINDOW_HEIGHT, SDL_WINDOW_RESIZABLE);
+    window = SDL_CreateWindow ("Heligoland", WINDOW_WIDTH, WINDOW_HEIGHT, SDL_WINDOW_RESIZABLE | SDL_WINDOW_HIGH_PIXEL_DENSITY);
     if (! window)
     {
         SDL_Log ("Failed to create window: %s", SDL_GetError());
@@ -217,9 +217,10 @@ bool Game::anyButtonPressed()
 void Game::startGame()
 {
     // Create ships at starting positions
+    bool isTeamMode = (gameMode == GameMode::Teams);
     for (int i = 0; i < NUM_SHIPS; ++i)
     {
-        ships[i] = std::make_unique<Ship> (i, getShipStartPosition (i), getShipStartAngle (i));
+        ships[i] = std::make_unique<Ship> (i, getShipStartPosition (i), getShipStartAngle (i), isTeamMode);
     }
 
     shells.clear();

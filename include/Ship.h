@@ -26,7 +26,7 @@ struct Smoke
 class Ship
 {
 public:
-    Ship (int playerIndex, Vec2 startPos, float startAngle);
+    Ship (int playerIndex, Vec2 startPos, float startAngle, bool teamMode = false);
 
     void update (float dt, Vec2 moveInput, Vec2 aimInput, bool fireInput, float arenaWidth, float arenaHeight, Vec2 wind);
 
@@ -66,6 +66,7 @@ public:
 
 private:
     int playerIndex;
+    bool teamMode;
     Vec2 position;
     Vec2 velocity;
     float angle = 0.0f; // Ship facing direction (radians)

@@ -3,13 +3,13 @@
 #include <algorithm>
 #include <cmath>
 
-Ship::Ship (int playerIndex_, Vec2 startPos, float startAngle)
-    : playerIndex (playerIndex_), position (startPos), angle (startAngle), turrets { {
-                                                                               Turret ({ length * 0.35f, 0.0f }, true), // Front
-                                                                               Turret ({ length * 0.12f, 0.0f }, true), // Front-mid
-                                                                               Turret ({ -length * 0.12f, 0.0f }, false), // Rear-mid
-                                                                               Turret ({ -length * 0.35f, 0.0f }, false) // Rear
-                                                                           } }
+Ship::Ship (int playerIndex_, Vec2 startPos, float startAngle, bool teamMode_)
+    : playerIndex (playerIndex_), teamMode (teamMode_), position (startPos), angle (startAngle), turrets { {
+                                                                                                     Turret ({ length * 0.35f, 0.0f }, true), // Front
+                                                                                                     Turret ({ length * 0.12f, 0.0f }, true), // Front-mid
+                                                                                                     Turret ({ -length * 0.12f, 0.0f }, false), // Rear-mid
+                                                                                                     Turret ({ -length * 0.35f, 0.0f }, false) // Rear
+                                                                                                 } }
 {
     // Start crosshair in front of ship
     crosshairOffset = Vec2::fromAngle (angle) * 150.0f;
@@ -212,18 +212,40 @@ void Ship::clampToArena (float arenaWidth, float arenaHeight)
 
 SDL_Color Ship::getColor() const
 {
-    switch (playerIndex)
+    if (teamMode)
     {
-        case 0:
-            return { 255, 100, 100, 255 }; // Red
-        case 1:
-            return { 100, 100, 255, 255 }; // Blue
-        case 2:
-            return { 100, 255, 100, 255 }; // Green
-        case 3:
-            return { 255, 255, 100, 255 }; // Yellow
-        default:
-            return { 200, 200, 200, 255 }; // Gray
+        // Team 1 (players 0, 1): Red shades
+        // Team 2 (players 2, 3): Blue shades
+        switch (playerIndex)
+        {
+            case 0:
+                return { 200, 60, 60, 255 }; // Dark red
+            case 1:
+                return { 255, 130, 130, 255 }; // Light red
+            case 2:
+                return { 60, 60, 200, 255 }; // Dark blue
+            case 3:
+                return { 130, 130, 255, 255 }; // Light blue
+            default:
+                return { 200, 200, 200, 255 }; // Gray
+        }
+    }
+    else
+    {
+        // FFA: distinct colors for each player
+        switch (playerIndex)
+        {
+            case 0:
+                return { 255, 100, 100, 255 }; // Red
+            case 1:
+                return { 100, 100, 255, 255 }; // Blue
+            case 2:
+                return { 100, 255, 100, 255 }; // Green
+            case 3:
+                return { 255, 255, 100, 255 }; // Yellow
+            default:
+                return { 200, 200, 200, 255 }; // Gray
+        }
     }
 }
 

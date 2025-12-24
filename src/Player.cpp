@@ -51,18 +51,18 @@ void Player::update()
     float leftY = SDL_GetGamepadAxis (gamepad, SDL_GAMEPAD_AXIS_LEFTY) / 32767.0f;
     moveInput.y = applyDeadzone (leftY);
 
-    // Rudder: combine left stick X, right stick X, and triggers
+    // Rudder: left stick X and triggers
     float leftX = SDL_GetGamepadAxis (gamepad, SDL_GAMEPAD_AXIS_LEFTX) / 32767.0f;
-    float rightX = SDL_GetGamepadAxis (gamepad, SDL_GAMEPAD_AXIS_RIGHTX) / 32767.0f;
     float leftTrigger = SDL_GetGamepadAxis (gamepad, SDL_GAMEPAD_AXIS_LEFT_TRIGGER) / 32767.0f;
     float rightTrigger = SDL_GetGamepadAxis (gamepad, SDL_GAMEPAD_AXIS_RIGHT_TRIGGER) / 32767.0f;
 
-    float stickRudder = applyDeadzone (leftX) + applyDeadzone (rightX);
+    float stickRudder = applyDeadzone (leftX);
     float triggerRudder = rightTrigger - leftTrigger; // Right trigger = turn right, left = turn left
 
     moveInput.x = std::clamp (stickRudder + triggerRudder, -1.0f, 1.0f);
 
     // Right stick for aiming crosshair
+    float rightX = SDL_GetGamepadAxis (gamepad, SDL_GAMEPAD_AXIS_RIGHTX) / 32767.0f;
     float rightY = SDL_GetGamepadAxis (gamepad, SDL_GAMEPAD_AXIS_RIGHTY) / 32767.0f;
     aimInput.x = applyDeadzone (rightX);
     aimInput.y = applyDeadzone (rightY);
