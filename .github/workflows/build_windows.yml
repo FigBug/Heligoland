@@ -19,6 +19,9 @@ jobs:
       - name: Build
         run: cmake --build build --config Release
 
+      - name: Install NSIS
+        run: choco install nsis -y
+
       - name: Create Installer
         run: |
           cd build
