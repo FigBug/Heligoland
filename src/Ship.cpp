@@ -168,36 +168,45 @@ void Ship::update (float dt, Vec2 moveInput, Vec2 aimInput, bool fireInput, floa
 
 void Ship::clampToArena (float arenaWidth, float arenaHeight)
 {
-    float halfLength = length / 2.0f;
-    float halfWidth = width / 2.0f;
-    float margin = std::max (halfLength, halfWidth);
+    // Get actual corners of the rotated ship
+    auto corners = getCorners();
 
-    bool hitEdge = false;
+    // Find how far each corner is outside the arena
+    float pushLeft = 0.0f, pushRight = 0.0f, pushUp = 0.0f, pushDown = 0.0f;
 
-    if (position.x < margin)
+    for (const auto& corner : corners)
     {
-        position.x = margin;
-        velocity.x = std::abs (velocity.x) * 0.3f; // Bounce slightly
-        hitEdge = true;
+        if (corner.x < 0)
+            pushLeft = std::max (pushLeft, -corner.x);
+        if (corner.x > arenaWidth)
+            pushRight = std::max (pushRight, corner.x - arenaWidth);
+        if (corner.y < 0)
+            pushUp = std::max (pushUp, -corner.y);
+        if (corner.y > arenaHeight)
+            pushDown = std::max (pushDown, corner.y - arenaHeight);
     }
-    else if (position.x > arenaWidth - margin)
+
+    // Apply corrections
+    if (pushLeft > 0)
     {
-        position.x = arenaWidth - margin;
+        position.x += pushLeft;
+        velocity.x = std::abs (velocity.x) * 0.3f;
+    }
+    else if (pushRight > 0)
+    {
+        position.x -= pushRight;
         velocity.x = -std::abs (velocity.x) * 0.3f;
-        hitEdge = true;
     }
 
-    if (position.y < margin)
+    if (pushUp > 0)
     {
-        position.y = margin;
+        position.y += pushUp;
         velocity.y = std::abs (velocity.y) * 0.3f;
-        hitEdge = true;
     }
-    else if (position.y > arenaHeight - margin)
+    else if (pushDown > 0)
     {
-        position.y = arenaHeight - margin;
+        position.y -= pushDown;
         velocity.y = -std::abs (velocity.y) * 0.3f;
-        hitEdge = true;
     }
 }
 
@@ -374,15 +383,23 @@ void Ship::updateBubbles (float dt)
 
 void Ship::updateSmoke (float dt, Vec2 wind)
 {
-    float fadeTime = 3.0f; // Smoke fades over 3 seconds
+    float fadeTime = 10.0f; // Smoke fades over 10 seconds
     float fadeRate = 1.0f / fadeTime;
-    float windStrength = 50.0f; // How much wind affects smoke
+    float windStrength = 10.0f; // How much wind affects smoke
 
     // Update existing smoke - fade and move with wind
     for (auto it = smoke.begin(); it != smoke.end();)
     {
         it->alpha -= fadeRate * dt;
-        it->position += wind * windStrength * dt;
+
+        // Apply wind with this particle's fixed angle offset
+        float cosR = std::cos (it->windAngleOffset);
+        float sinR = std::sin (it->windAngleOffset);
+        Vec2 dispersedWind;
+        dispersedWind.x = wind.x * cosR - wind.y * sinR;
+        dispersedWind.y = wind.x * sinR + wind.y * cosR;
+
+        it->position += dispersedWind * windStrength * dt;
 
         if (it->alpha <= 0.0f)
         {
@@ -399,7 +416,7 @@ void Ship::updateSmoke (float dt, Vec2 wind)
     smokeSpawnTimer += dt;
 
     // Base spawn interval for engine smoke, faster with damage
-    float baseSpawnInterval = 0.5f; // Undamaged ships: smoke every 0.5s
+    float baseSpawnInterval = 0.0333f; // Undamaged ships: smoke every ~33ms
     float spawnInterval = baseSpawnInterval / (1.0f + damagePercent * 4.0f);
 
     while (smokeSpawnTimer >= spawnInterval)
@@ -432,6 +449,9 @@ void Ship::updateSmoke (float dt, Vec2 wind)
         // Lower starting alpha for thinner smoke
         float startAlpha = 0.4f + damagePercent * 0.4f; // 0.4 to 0.8 based on damage
 
-        smoke.push_back ({ spawnPos, smokeRadius, startAlpha });
+        // Random wind angle offset +/- 3 degrees (0.052 radians)
+        float windAngleOffset = ((float) rand() / RAND_MAX - 0.5f) * 0.105f;
+
+        smoke.push_back ({ spawnPos, smokeRadius, startAlpha, windAngleOffset });
     }
 }

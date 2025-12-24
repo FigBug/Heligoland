@@ -1,0 +1,80 @@
+name: Build macOS
+on: [push]
+jobs:
+  build:
+    name: Build macOS
+    runs-on: macos-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - name: Setup Keychain
+        if: env.APPLICATION != ''
+        run: |
+          security create-keychain -p "$KEYCHAIN_PASS" build.keychain
+          security default-keychain -s build.keychain
+          security unlock-keychain -p "$KEYCHAIN_PASS" build.keychain
+          security set-keychain-settings -l -u -t 13600 build.keychain
+
+          echo "$APPLICATION" | base64 -D -o /tmp/Application.p12
+          security import /tmp/Application.p12 -t agg -k build.keychain -P "$CERT_PASS" -A -T /usr/bin/codesign
+          security set-key-partition-list -S apple-tool:,apple: -s -k "$KEYCHAIN_PASS" build.keychain
+        env:
+          APPLICATION: ${{ secrets.APPLICATION }}
+          CERT_PASS: ${{ secrets.CERT_PASS }}
+          KEYCHAIN_PASS: ${{ secrets.KEYCHAIN_PASS }}
+
+      - name: Configure
+        run: cmake -B build -DCMAKE_BUILD_TYPE=Release
+
+      - name: Build
+        run: cmake --build build --config Release
+
+      - name: Sign Application
+        if: env.APPLICATION != ''
+        run: |
+          codesign --deep --force --verify --verbose --timestamp \
+            --options runtime \
+            --sign "$DEV_ID" \
+            build/Heligoland.app
+        env:
+          APPLICATION: ${{ secrets.APPLICATION }}
+          DEV_ID: ${{ secrets.DEV_ID }}
+
+      - name: Notarize Application
+        if: env.APPLE_USER != ''
+        run: |
+          cd build
+          zip -r Heligoland_macOS.zip Heligoland.app
+
+          xcrun notarytool submit \
+            --apple-id "$APPLE_USER" \
+            --password "$APPLE_PASS" \
+            --team-id "$TEAM_ID" \
+            --wait --timeout 30m \
+            Heligoland_macOS.zip
+
+          xcrun stapler staple Heligoland.app
+
+          rm Heligoland_macOS.zip
+          zip -r Heligoland_macOS.zip Heligoland.app
+        env:
+          APPLE_USER: ${{ secrets.APPLE_USER }}
+          APPLE_PASS: ${{ secrets.APPLE_PASS }}
+          TEAM_ID: ${{ secrets.TEAM_ID }}
+
+      - name: Create Unsigned ZIP
+        if: env.APPLICATION == ''
+        run: |
+          cd build
+          zip -r Heligoland_macOS.zip Heligoland.app
+        env:
+          APPLICATION: ${{ secrets.APPLICATION }}
+
+      - name: Upload Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: Heligoland_macOS
+          path: build/Heligoland_macOS.zip

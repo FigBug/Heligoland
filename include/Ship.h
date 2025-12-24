@@ -20,6 +20,7 @@ struct Smoke
     Vec2 position;
     float radius;
     float alpha; // 0.0 to 1.0
+    float windAngleOffset; // Random offset added to wind direction
 };
 
 class Ship

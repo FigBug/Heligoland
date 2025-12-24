@@ -28,6 +28,9 @@ bool Game::init()
         return false;
     }
 
+    // Set up logical presentation for high DPI displays
+    setupLogicalPresentation();
+
     renderer = std::make_unique<Renderer> (sdlRenderer);
 
     // Create players (but not ships yet - those are created when game starts)
@@ -100,6 +103,10 @@ void Game::handleEvents()
                 running = false;
             }
         }
+        else if (event.type == SDL_EVENT_WINDOW_RESIZED)
+        {
+            handleWindowResize();
+        }
 
         // Pass events to players for gamepad handling
         for (auto& player : players)
@@ -166,9 +173,9 @@ void Game::startGame()
     gameOverTimer = 0.0f;
     gameStartDelay = 0.5f; // Ignore fire input for first 0.5 seconds
 
-    // Initialize wind
+    // Initialize wind (minimum 25% strength)
     float windAngle = ((float) rand() / RAND_MAX) * 2.0f * M_PI;
-    float windStrength = ((float) rand() / RAND_MAX);
+    float windStrength = 0.25f + ((float) rand() / RAND_MAX) * 0.75f;
     wind = Vec2::fromAngle (windAngle) * windStrength;
     targetWind = wind;
     windChangeTimer = WIND_CHANGE_INTERVAL;
@@ -188,10 +195,10 @@ void Game::updateWind (float dt)
         float angleChange = ((float) rand() / RAND_MAX - 0.5f) * M_PI / 3.0f; // +/- 30 degrees
         float newAngle = currentAngle + angleChange;
 
-        // Small strength change (up to 20% either way)
+        // Small strength change (up to 20% either way), minimum 25%
         float currentStrength = wind.length();
         float strengthChange = ((float) rand() / RAND_MAX - 0.5f) * 0.4f;
-        float newStrength = std::clamp (currentStrength + strengthChange, 0.1f, 1.0f);
+        float newStrength = std::clamp (currentStrength + strengthChange, 0.25f, 1.0f);
 
         targetWind = Vec2::fromAngle (newAngle) * newStrength;
         windChangeTimer = WIND_CHANGE_INTERVAL;
@@ -291,8 +298,46 @@ void Game::updatePlaying (float dt)
 
 void Game::updateGameOver (float dt)
 {
+    float arenaWidth, arenaHeight;
+    getWindowSize (arenaWidth, arenaHeight);
+
+    // Keep updating ships (for smoke effects)
+    for (int i = 0; i < NUM_SHIPS; ++i)
+    {
+        if (ships[i] && ships[i]->isAlive())
+        {
+            ships[i]->update (dt, { 0, 0 }, { 0, 0 }, false, arenaWidth, arenaHeight, wind);
+        }
+    }
+
+    // Keep updating shells so they land and disappear
+    updateShells (dt);
+
+    // Kill landed shells and spawn splashes (normally done in checkCollisions)
+    for (auto& shell : shells)
+    {
+        if (shell.isAlive() && shell.hasLanded())
+        {
+            Explosion splash;
+            splash.position = shell.getPosition();
+            splash.isHit = false;
+            explosions.push_back (splash);
+            shell.kill();
+        }
+    }
+
+    // Keep updating explosions
+    for (auto& explosion : explosions)
+    {
+        explosion.timer += dt;
+    }
+    explosions.erase (
+        std::remove_if (explosions.begin(), explosions.end(), [] (const Explosion& e)
+                        { return ! e.isAlive(); }),
+        explosions.end());
+
     gameOverTimer += dt;
-    if (gameOverTimer >= GAME_OVER_DELAY)
+    if (gameOverTimer >= GAME_OVER_RETURN_DELAY)
     {
         returnToTitle();
     }
@@ -698,6 +743,12 @@ void Game::renderPlaying()
 
 void Game::renderGameOver()
 {
+    // Wait before showing text so player can see the final explosion
+    if (gameOverTimer < GAME_OVER_TEXT_DELAY)
+    {
+        return;
+    }
+
     float w, h;
     getWindowSize (w, h);
 
@@ -741,7 +792,25 @@ float Game::getShipStartAngle (int index) const
 void Game::getWindowSize (float& width, float& height) const
 {
     int w, h;
-    SDL_GetWindowSizeInPixels (window, &w, &h);
+    SDL_GetWindowSize (window, &w, &h);
     width = (float) w;
     height = (float) h;
+}
+
+void Game::setupLogicalPresentation()
+{
+    // Get window size in points (logical pixels)
+    int windowWidth, windowHeight;
+    SDL_GetWindowSize (window, &windowWidth, &windowHeight);
+
+    // Set logical presentation so rendering uses logical coordinates
+    // SDL will automatically scale to physical pixels on high DPI displays
+    SDL_SetRenderLogicalPresentation (sdlRenderer, windowWidth, windowHeight,
+                                      SDL_LOGICAL_PRESENTATION_LETTERBOX);
+}
+
+void Game::handleWindowResize()
+{
+    // Update logical presentation when window is resized
+    setupLogicalPresentation();
 }

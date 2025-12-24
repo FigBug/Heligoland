@@ -40,5 +40,6 @@ private:
 
     void drawFilledOval (Vec2 center, float width, float height, float angle, SDL_Color color);
     void drawFilledCircle (Vec2 center, float radius, SDL_Color color);
+    void drawShipHull (Vec2 center, float length, float width, float angle, SDL_Color color);
     void drawChar (char c, Vec2 position, float scale, SDL_Color color);
 };

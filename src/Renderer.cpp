@@ -27,8 +27,8 @@ void Renderer::drawShip (const Ship& ship)
     float angle = ship.getAngle();
     SDL_Color color = ship.getColor();
 
-    // Draw ship hull (oval) - length is along the ship's facing direction
-    drawFilledOval (pos, ship.getLength(), ship.getWidth(), angle, color);
+    // Draw ship hull - pointy bow, squarer stern
+    drawShipHull (pos, ship.getLength(), ship.getWidth(), angle, color);
 
     // Draw turrets
     float cosA = std::cos (angle);
@@ -362,6 +362,147 @@ void Renderer::drawFilledOval (Vec2 center, float width, float height, float ang
         255
     };
     drawOval (center, width, height, angle, outlineColor);
+}
+
+void Renderer::drawShipHull (Vec2 center, float length, float width, float angle, SDL_Color color)
+{
+    SDL_SetRenderDrawBlendMode (renderer, SDL_BLENDMODE_BLEND);
+    SDL_SetRenderDrawColor (renderer, color.r, color.g, color.b, color.a);
+
+    float cosA = std::cos (angle);
+    float sinA = std::sin (angle);
+
+    float halfLength = length / 2.0f;
+    float halfWidth = width / 2.0f;
+
+    // Ship shape: pointy bow, curved sides, squarer stern
+    // Draw using horizontal scanlines from stern to bow
+
+    int numLines = (int) length;
+
+    for (int i = 0; i <= numLines; ++i)
+    {
+        // t goes from -1 (stern) to 1 (bow)
+        float t = (float) i / numLines * 2.0f - 1.0f;
+        float localX = t * halfLength;
+
+        float localHalfWidth;
+
+        if (t > 0.7f)
+        {
+            // Bow section - taper to a point
+            float bowT = (t - 0.7f) / 0.3f; // 0 to 1 in bow section
+            localHalfWidth = halfWidth * (1.0f - bowT * bowT); // Quadratic taper to point
+        }
+        else if (t < -0.6f)
+        {
+            // Stern section - slightly rounded but more square
+            float sternT = (-t - 0.6f) / 0.4f; // 0 to 1 in stern section
+            localHalfWidth = halfWidth * (1.0f - sternT * sternT * 0.3f); // Gentle curve
+        }
+        else
+        {
+            // Main body - full width with slight curve
+            float bodyT = (t + 0.6f) / 1.3f; // Normalized position in body
+            // Slight bulge in the middle
+            localHalfWidth = halfWidth * (1.0f + 0.05f * std::sin (bodyT * M_PI));
+        }
+
+        if (localHalfWidth > 0.5f)
+        {
+            // Two endpoints of the scanline in local coords
+            float y1 = -localHalfWidth;
+            float y2 = localHalfWidth;
+
+            // Rotate to world coords
+            float wx1 = localX * cosA - y1 * sinA + center.x;
+            float wy1 = localX * sinA + y1 * cosA + center.y;
+            float wx2 = localX * cosA - y2 * sinA + center.x;
+            float wy2 = localX * sinA + y2 * cosA + center.y;
+
+            SDL_RenderLine (renderer, wx1, wy1, wx2, wy2);
+        }
+    }
+
+    // Draw outline for better visibility
+    SDL_Color outlineColor = {
+        (Uint8) (color.r * 0.5f),
+        (Uint8) (color.g * 0.5f),
+        (Uint8) (color.b * 0.5f),
+        255
+    };
+    SDL_SetRenderDrawColor (renderer, outlineColor.r, outlineColor.g, outlineColor.b, outlineColor.a);
+
+    // Draw outline by tracing the hull shape
+    std::vector<Vec2> hullPoints;
+    int outlineSegments = 32;
+
+    for (int i = 0; i <= outlineSegments; ++i)
+    {
+        float t = (float) i / outlineSegments * 2.0f - 1.0f;
+        float localX = t * halfLength;
+
+        float localHalfWidth;
+
+        if (t > 0.7f)
+        {
+            float bowT = (t - 0.7f) / 0.3f;
+            localHalfWidth = halfWidth * (1.0f - bowT * bowT);
+        }
+        else if (t < -0.6f)
+        {
+            float sternT = (-t - 0.6f) / 0.4f;
+            localHalfWidth = halfWidth * (1.0f - sternT * sternT * 0.3f);
+        }
+        else
+        {
+            float bodyT = (t + 0.6f) / 1.3f;
+            localHalfWidth = halfWidth * (1.0f + 0.05f * std::sin (bodyT * M_PI));
+        }
+
+        // Top edge (positive Y in local)
+        float wx = localX * cosA - localHalfWidth * sinA + center.x;
+        float wy = localX * sinA + localHalfWidth * cosA + center.y;
+        hullPoints.push_back ({ wx, wy });
+    }
+
+    // Add bottom edge in reverse
+    for (int i = outlineSegments; i >= 0; --i)
+    {
+        float t = (float) i / outlineSegments * 2.0f - 1.0f;
+        float localX = t * halfLength;
+
+        float localHalfWidth;
+
+        if (t > 0.7f)
+        {
+            float bowT = (t - 0.7f) / 0.3f;
+            localHalfWidth = halfWidth * (1.0f - bowT * bowT);
+        }
+        else if (t < -0.6f)
+        {
+            float sternT = (-t - 0.6f) / 0.4f;
+            localHalfWidth = halfWidth * (1.0f - sternT * sternT * 0.3f);
+        }
+        else
+        {
+            float bodyT = (t + 0.6f) / 1.3f;
+            localHalfWidth = halfWidth * (1.0f + 0.05f * std::sin (bodyT * M_PI));
+        }
+
+        // Bottom edge (negative Y in local)
+        float wx = localX * cosA - (-localHalfWidth) * sinA + center.x;
+        float wy = localX * sinA + (-localHalfWidth) * cosA + center.y;
+        hullPoints.push_back ({ wx, wy });
+    }
+
+    // Draw outline
+    for (size_t i = 0; i < hullPoints.size(); ++i)
+    {
+        size_t next = (i + 1) % hullPoints.size();
+        SDL_RenderLine (renderer, hullPoints[i].x, hullPoints[i].y,
+                        hullPoints[next].x, hullPoints[next].y);
+    }
 }
 
 void Renderer::drawCircle (Vec2 center, float radius, SDL_Color color)

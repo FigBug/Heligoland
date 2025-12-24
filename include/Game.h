@@ -44,7 +44,8 @@ private:
     static constexpr int WINDOW_HEIGHT = 720;
     static constexpr int NUM_SHIPS = 4;
     static constexpr float SHELL_DAMAGE = 100.0f;
-    static constexpr float GAME_OVER_DELAY = 5.0f;
+    static constexpr float GAME_OVER_TEXT_DELAY = 5.0f; // Delay before showing winner text
+    static constexpr float GAME_OVER_RETURN_DELAY = 8.0f; // Total delay before returning to title
 
     SDL_Window* window = nullptr;
     SDL_Renderer* sdlRenderer = nullptr;
@@ -98,4 +99,6 @@ private:
     Vec2 getShipStartPosition (int index) const;
     float getShipStartAngle (int index) const;
     void getWindowSize (float& width, float& height) const;
+    void setupLogicalPresentation();
+    void handleWindowResize();
 };

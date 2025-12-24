@@ -94,50 +94,46 @@ void Turret::update (float dt, float shipAngle, Vec2 targetDir)
     while (angleDiff < -M_PI)
         angleDiff += 2.0f * M_PI;
 
-    // Check if the short path is blocked by arc limits
-    // If so, go the long way around
+    float maxRotation = rotationSpeed * dt;
+
+    // Check if the short path crosses the forbidden zone
+    // If so, force rotation the long way around
     float arcSize = M_PI * 0.75f; // 135 degrees
+
+    // Test if rotating in the short direction would hit the forbidden zone
+    float testStep = maxRotation * (angleDiff > 0 ? 1.0f : -1.0f);
+    float testAngle = angle + testStep;
+
+    // Normalize test angle
+    while (testAngle > M_PI)
+        testAngle -= 2.0f * M_PI;
+    while (testAngle < -M_PI)
+        testAngle += 2.0f * M_PI;
+
+    bool wouldHitLimit = false;
 
     if (isFront)
     {
-        // Front turrets: forbidden zone is beyond ±135° (the rear of the ship)
-        // If short path would cross the back, go through front (0) instead
-        bool angleInPositive = angle > 0;
-        bool targetInPositive = targetAngle > 0;
-        bool crossesBack = (angleInPositive != targetInPositive) && std::abs (angleDiff) > M_PI * 0.5f;
-
-        if (crossesBack)
-        {
-            // Go through center (0) instead of back
-            if (angle > 0)
-                angleDiff = -0.1f;
-            else
-                angleDiff = 0.1f;
-        }
+        // Front turrets: forbidden zone is beyond ±135°
+        wouldHitLimit = (std::abs (testAngle) > arcSize) && (std::abs (angle) <= arcSize);
     }
     else
     {
-        // Rear turrets: forbidden zone is near 0 (the front of the ship)
-        // Can only aim from 45° to 180° and -180° to -45°
+        // Rear turrets: forbidden zone is near 0 (within ±45°)
         float limit = M_PI - arcSize; // 45 degrees
-
-        // If both angles are in the valid rear arc but on opposite sides,
-        // and the short path would cross through the forbidden front zone
-        bool angleNearLimit = std::abs (angle) < M_PI * 0.6f;
-        bool targetNearLimit = std::abs (targetAngle) < M_PI * 0.6f;
-        bool crossesFront = angleNearLimit && targetNearLimit && (angle * targetAngle < 0);
-
-        if (crossesFront)
-        {
-            // Go through back (±PI) instead of front
-            if (angle > 0)
-                angleDiff = 0.1f; // Rotate toward +PI
-            else
-                angleDiff = -0.1f; // Rotate toward -PI
-        }
+        wouldHitLimit = (std::abs (testAngle) < limit) && (std::abs (angle) >= limit);
     }
 
-    float maxRotation = rotationSpeed * dt;
+    // If short path is blocked, go the long way
+    if (wouldHitLimit)
+    {
+        angleDiff = -angleDiff;
+        // Use the sign of the long way
+        if (std::abs (angleDiff) < M_PI)
+        {
+            angleDiff = (angleDiff > 0 ? 1.0f : -1.0f) * (2.0f * M_PI - std::abs (angleDiff));
+        }
+    }
     if (std::abs (angleDiff) < maxRotation)
     {
         angle = targetAngle;
@@ -150,9 +146,6 @@ void Turret::update (float dt, float shipAngle, Vec2 targetDir)
     {
         angle -= maxRotation;
     }
-
-    // Clamp angle to valid arc
-    angle = clampAngleToArc (angle);
 
     // Keep angle in [-PI, PI]
     while (angle > M_PI)
