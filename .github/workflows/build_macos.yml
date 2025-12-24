@@ -1,11 +1,14 @@
 name: Build macOS
-on: [push]
+on:
+  push:
+    branches:
+      - '**'
 jobs:
   build:
     name: Build macOS
     runs-on: macos-latest
     env:
-      HAS_SIGNING: ${{ secrets.APPLICATION != '' }}
+      HAS_SIGNING: ${{ secrets.DEV_ID != '' }}
     steps:
       - name: Checkout
         uses: actions/checkout@v4
