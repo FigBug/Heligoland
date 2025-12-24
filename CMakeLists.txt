@@ -77,6 +77,8 @@ target_link_libraries(${PROJECT_NAME} PRIVATE raylib)
 # Platform-specific settings
 if(WIN32)
     set_target_properties(${PROJECT_NAME} PROPERTIES WIN32_EXECUTABLE TRUE)
+    # Disable linker manifest generation since we provide our own in icon.rc
+    target_link_options(${PROJECT_NAME} PRIVATE "/MANIFEST:NO")
 elseif(APPLE)
     set_target_properties(${PROJECT_NAME} PROPERTIES
         MACOSX_BUNDLE_BUNDLE_NAME "Heligoland"
