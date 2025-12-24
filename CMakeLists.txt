@@ -112,8 +112,8 @@ if(APPLE)
     # macOS: Create .pkg installer
     set(CPACK_GENERATOR "productbuild")
     set(CPACK_PRODUCTBUILD_IDENTIFIER "com.heligoland.game")
-    set(CPACK_PRODUCTBUILD_IDENTITY_NAME "INSTALLER")
 
+    # Signing is handled separately in CI with productsign
     # Install the app bundle to /Applications
     install(TARGETS ${PROJECT_NAME} BUNDLE DESTINATION "." COMPONENT Runtime)
 
