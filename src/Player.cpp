@@ -21,6 +21,16 @@ void Player::update()
         tryOpenGamepad();
     }
 
+    // Player 0 can use keyboard/mouse if no gamepad
+    if (gamepadId < 0 && playerIndex == 0)
+    {
+        usingKeyboard = true;
+        updateKeyboardMouse();
+        return;
+    }
+
+    usingKeyboard = false;
+
     if (gamepadId < 0)
     {
         moveInput = { 0, 0 };
@@ -61,6 +71,32 @@ void Player::update()
                 IsGamepadButtonDown (gamepadId, GAMEPAD_BUTTON_RIGHT_FACE_UP) ||    // Y / Triangle
                 IsGamepadButtonDown (gamepadId, GAMEPAD_BUTTON_LEFT_TRIGGER_1) ||
                 IsGamepadButtonDown (gamepadId, GAMEPAD_BUTTON_RIGHT_TRIGGER_1);
+}
+
+void Player::updateKeyboardMouse()
+{
+    // Arrow keys for throttle and rudder
+    moveInput = { 0, 0 };
+
+    if (IsKeyDown (KEY_UP))
+        moveInput.y = -1.0f;  // Forward (negative Y is forward)
+    else if (IsKeyDown (KEY_DOWN))
+        moveInput.y = 1.0f;   // Reverse
+
+    if (IsKeyDown (KEY_LEFT))
+        moveInput.x = -1.0f;  // Turn left
+    else if (IsKeyDown (KEY_RIGHT))
+        moveInput.x = 1.0f;   // Turn right
+
+    // Mouse position for aiming (stored as world position)
+    Vector2 mouse = GetMousePosition();
+    mousePosition = { mouse.x, mouse.y };
+
+    // aimInput not used for mouse aiming - Game will set crosshair directly
+    aimInput = { 0, 0 };
+
+    // Mouse click to fire
+    fireInput = IsMouseButtonDown (MOUSE_BUTTON_LEFT);
 }
 
 float Player::applyDeadzone (float value) const

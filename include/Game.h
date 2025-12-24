@@ -79,6 +79,10 @@ private:
     static constexpr float WIND_LERP_SPEED = 0.05f; // How fast wind changes (very gradual)
     static constexpr float MAX_WIND_DRIFT = 0.01f; // 1% max drift
 
+    // Win tracking
+    std::array<int, NUM_SHIPS> playerWins = {}; // Wins per player in FFA mode
+    std::array<int, 2> teamWins = {};           // Wins per team in Teams mode
+
     void updateWind (float dt);
 
     void handleEvents();

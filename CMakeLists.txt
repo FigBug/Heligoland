@@ -32,6 +32,10 @@ set(SOURCES
     src/Audio.cpp
 )
 
+if(WIN32)
+    list(APPEND SOURCES src/WinMain.cpp)
+endif()
+
 set(HEADERS
     include/Game.h
     include/Ship.h

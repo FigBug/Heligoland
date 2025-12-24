@@ -37,6 +37,7 @@ public:
     int getPlayerIndex() const { return playerIndex; }
     const std::array<Turret, 4>& getTurrets() const { return turrets; }
     Vec2 getCrosshairPosition() const { return position + crosshairOffset; }
+    void setCrosshairPosition (Vec2 worldPos);  // For mouse aiming
     const std::vector<Bubble>& getBubbles() const { return bubbles; }
     const std::vector<Smoke>& getSmoke() const { return smoke; }
     float getDamagePercent() const { return 1.0f - (health / maxHealth); }

@@ -12,6 +12,7 @@ bool Game::init()
     SetConfigFlags (FLAG_WINDOW_RESIZABLE | FLAG_MSAA_4X_HINT);
     InitWindow (WINDOW_WIDTH, WINDOW_HEIGHT, "Heligoland");
     SetTargetFPS (60);
+    HideCursor();
 
     renderer = std::make_unique<Renderer>();
     audio = std::make_unique<Audio>();
@@ -108,12 +109,12 @@ void Game::update (float dt)
 
 void Game::updateTitle (float dt)
 {
-    // Check for mode switching with bumpers/triggers
-    static bool leftBumperWasPressed = false;
-    static bool rightBumperWasPressed = false;
+    // Check for mode switching with bumpers or arrow keys
+    static bool leftWasPressed = false;
+    static bool rightWasPressed = false;
 
-    bool leftBumperPressed = false;
-    bool rightBumperPressed = false;
+    bool leftPressed = IsKeyDown (KEY_LEFT);
+    bool rightPressed = IsKeyDown (KEY_RIGHT);
 
     // Check all gamepads for bumper presses
     for (int i = 0; i < 4; ++i)
@@ -121,22 +122,22 @@ void Game::updateTitle (float dt)
         if (IsGamepadAvailable (i))
         {
             if (IsGamepadButtonDown (i, GAMEPAD_BUTTON_LEFT_TRIGGER_1))
-                leftBumperPressed = true;
+                leftPressed = true;
             if (IsGamepadButtonDown (i, GAMEPAD_BUTTON_RIGHT_TRIGGER_1))
-                rightBumperPressed = true;
+                rightPressed = true;
         }
     }
 
-    // Cycle mode on bumper press (with edge detection)
-    if (leftBumperPressed && ! leftBumperWasPressed)
+    // Cycle mode on press (with edge detection)
+    if (leftPressed && ! leftWasPressed)
         cycleGameMode (-1);
-    if (rightBumperPressed && ! rightBumperWasPressed)
+    if (rightPressed && ! rightWasPressed)
         cycleGameMode (1);
 
-    leftBumperWasPressed = leftBumperPressed;
-    rightBumperWasPressed = rightBumperPressed;
+    leftWasPressed = leftPressed;
+    rightWasPressed = rightPressed;
 
-    // Check if any face button is pressed to start the game
+    // Check if any button or click is pressed to start the game
     if (anyButtonPressed())
     {
         startGame();
@@ -145,6 +146,10 @@ void Game::updateTitle (float dt)
 
 bool Game::anyButtonPressed()
 {
+    // Mouse click starts game
+    if (IsMouseButtonPressed (MOUSE_BUTTON_LEFT))
+        return true;
+
     // Check for face buttons only (not bumpers, which are used for mode switching)
     for (int i = 0; i < 4; ++i)
     {
@@ -271,6 +276,12 @@ void Game::updatePlaying (float dt)
         }
 
         ships[i]->update (dt, moveInput, aimInput, fireInput, arenaWidth, arenaHeight, wind);
+
+        // Set crosshair directly for mouse aiming
+        if (players[i]->isUsingMouse())
+        {
+            ships[i]->setCrosshairPosition (players[i]->getMousePosition());
+        }
 
         // Collect pending shells from ship
         auto& pendingShells = ships[i]->getPendingShells();
@@ -622,6 +633,10 @@ void Game::checkGameOver()
             else
                 winnerIndex = 1;   // Team 2 wins (index 1)
 
+            // Record the win
+            if (winnerIndex >= 0)
+                teamWins[winnerIndex]++;
+
             gameOverTimer = 0.0f;
             state = GameState::GameOver;
         }
@@ -644,6 +659,11 @@ void Game::checkGameOver()
         if (aliveCount <= 1)
         {
             winnerIndex = lastAlive;
+
+            // Record the win
+            if (winnerIndex >= 0)
+                playerWins[winnerIndex]++;
+
             gameOverTimer = 0.0f;
             state = GameState::GameOver;
         }
@@ -706,7 +726,7 @@ void Game::renderTitle()
     renderer->drawTextCentered (modeText, { w / 2.0f, h * 0.55f }, 4.0f, modeColor);
 
     Color modeHintColor = { 120, 120, 120, 255 };
-    renderer->drawTextCentered ("LB - RB TO CHANGE MODE", { w / 2.0f, h * 0.62f }, 1.5f, modeHintColor);
+    renderer->drawTextCentered ("LEFT - RIGHT TO CHANGE MODE", { w / 2.0f, h * 0.62f }, 1.5f, modeHintColor);
 
     // Draw player slots
     float slotY = h * 0.72f;
@@ -752,7 +772,7 @@ void Game::renderTitle()
 
     // Draw start instruction
     Color instructColor = { 150, 150, 150, 255 };
-    renderer->drawTextCentered ("PRESS ANY BUTTON TO START", { w / 2.0f, h * 0.90f }, 2.0f, instructColor);
+    renderer->drawTextCentered ("CLICK OR PRESS ANY BUTTON TO START", { w / 2.0f, h * 0.90f }, 2.0f, instructColor);
 }
 
 void Game::renderPlaying()
@@ -862,6 +882,7 @@ void Game::renderGameOver()
     getWindowSize (w, h);
 
     Color textColor = { 255, 255, 255, 255 };
+    Color statsColor = { 200, 200, 200, 255 };
 
     if (winnerIndex >= 0)
     {
@@ -871,11 +892,27 @@ void Game::renderGameOver()
         else
             winText = "PLAYER " + std::to_string (winnerIndex + 1) + " WINS!";
 
-        renderer->drawTextCentered (winText, { w / 2.0f, h / 2.0f }, 5.0f, textColor);
+        renderer->drawTextCentered (winText, { w / 2.0f, h / 2.0f - 30.0f }, 5.0f, textColor);
     }
     else
     {
-        renderer->drawTextCentered ("DRAW!", { w / 2.0f, h / 2.0f }, 5.0f, textColor);
+        renderer->drawTextCentered ("DRAW!", { w / 2.0f, h / 2.0f - 30.0f }, 5.0f, textColor);
+    }
+
+    // Display win statistics
+    if (gameMode == GameMode::Teams)
+    {
+        std::string statsText = "TEAM 1: " + std::to_string (teamWins[0]) +
+                                "  -  TEAM 2: " + std::to_string (teamWins[1]);
+        renderer->drawTextCentered (statsText, { w / 2.0f, h / 2.0f + 40.0f }, 2.5f, statsColor);
+    }
+    else
+    {
+        std::string statsText = "P1: " + std::to_string (playerWins[0]) +
+                                "  P2: " + std::to_string (playerWins[1]) +
+                                "  P3: " + std::to_string (playerWins[2]) +
+                                "  P4: " + std::to_string (playerWins[3]);
+        renderer->drawTextCentered (statsText, { w / 2.0f, h / 2.0f + 40.0f }, 2.5f, statsColor);
     }
 }
 

@@ -365,6 +365,18 @@ float Ship::getCrosshairDistance() const
     return crosshairOffset.length();
 }
 
+void Ship::setCrosshairPosition (Vec2 worldPos)
+{
+    crosshairOffset = worldPos - position;
+
+    // Clamp to max range
+    float dist = crosshairOffset.length();
+    if (dist > maxCrosshairDist)
+    {
+        crosshairOffset = crosshairOffset.normalized() * maxCrosshairDist;
+    }
+}
+
 bool Ship::isReadyToFire() const
 {
     // Check if reloaded

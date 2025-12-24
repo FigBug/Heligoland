@@ -1,15 +1,7 @@
 #include "Game.h"
 
-#if defined(_WIN32)
-#include <windows.h>
-
-int WINAPI WinMain (HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine, int nCmdShow)
+int runGame()
 {
-    (void) hInstance;
-    (void) hPrevInstance;
-    (void) lpCmdLine;
-    (void) nCmdShow;
-
     Game game;
 
     if (! game.init())
@@ -23,24 +15,14 @@ int WINAPI WinMain (HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLin
     return 0;
 }
 
-#else
+#if !defined(_WIN32)
 
 int main (int argc, char* argv[])
 {
     (void) argc;
     (void) argv;
 
-    Game game;
-
-    if (! game.init())
-    {
-        return 1;
-    }
-
-    game.run();
-    game.shutdown();
-
-    return 0;
+    return runGame();
 }
 
 #endif
