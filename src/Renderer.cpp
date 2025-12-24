@@ -525,12 +525,12 @@ void Renderer::drawLine (Vec2 start, Vec2 end, Color color)
 
 void Renderer::drawRect (Vec2 topLeft, float width, float height, Color color)
 {
-    DrawRectangleLines ((int) topLeft.x, (int) topLeft.y, (int) width, (int) height, color);
+    DrawRectangleLinesEx ({ topLeft.x, topLeft.y, width, height }, 1.0f, color);
 }
 
 void Renderer::drawFilledRect (Vec2 topLeft, float width, float height, Color color)
 {
-    DrawRectangle ((int) topLeft.x, (int) topLeft.y, (int) width, (int) height, color);
+    DrawRectangleV ({ topLeft.x, topLeft.y }, { width, height }, color);
 }
 
 // Simple 5x7 bitmap font patterns (each char is 5 wide, 7 tall)
