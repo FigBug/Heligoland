@@ -4,6 +4,8 @@ jobs:
   build:
     name: Build macOS
     runs-on: macos-latest
+    env:
+      HAS_SIGNING: ${{ secrets.APPLICATION != '' }}
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -11,7 +13,7 @@ jobs:
           submodules: recursive
 
       - name: Setup Keychain
-        if: env.APPLICATION != ''
+        if: env.HAS_SIGNING == 'true'
         run: |
           security create-keychain -p "$KEYCHAIN_PASS" build.keychain
           security default-keychain -s build.keychain
@@ -33,18 +35,17 @@ jobs:
         run: cmake --build build --config Release
 
       - name: Sign Application
-        if: env.APPLICATION != ''
+        if: env.HAS_SIGNING == 'true'
         run: |
           codesign --deep --force --verify --verbose --timestamp \
             --options runtime \
             --sign "$DEV_ID" \
             build/Heligoland.app
         env:
-          APPLICATION: ${{ secrets.APPLICATION }}
           DEV_ID: ${{ secrets.DEV_ID }}
 
       - name: Notarize Application
-        if: env.APPLE_USER != ''
+        if: env.HAS_SIGNING == 'true'
         run: |
           cd build
           zip -r Heligoland_macOS.zip Heligoland.app
@@ -65,13 +66,11 @@ jobs:
           APPLE_PASS: ${{ secrets.APPLE_PASS }}
           TEAM_ID: ${{ secrets.TEAM_ID }}
 
-      - name: Create Unsigned ZIP
-        if: env.APPLICATION == ''
+      - name: Create ZIP
+        if: env.HAS_SIGNING != 'true'
         run: |
           cd build
           zip -r Heligoland_macOS.zip Heligoland.app
-        env:
-          APPLICATION: ${{ secrets.APPLICATION }}
 
       - name: Upload Artifact
         uses: actions/upload-artifact@v4
