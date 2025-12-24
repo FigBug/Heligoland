@@ -14,6 +14,7 @@ public:
     Renderer (SDL_Renderer* renderer);
 
     void clear();
+    void drawWater (float time, float screenWidth, float screenHeight);
     void present();
 
     void drawShip (const Ship& ship);

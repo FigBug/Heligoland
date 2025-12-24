@@ -1,4 +1,5 @@
 #include "Player.h"
+#include <algorithm>
 #include <cmath>
 
 Player::Player (int playerIndex_)
@@ -42,27 +43,37 @@ void Player::update()
     {
         moveInput = { 0, 0 };
         aimInput = { 0, 0 };
+        fireInput = false;
         return;
     }
 
-    // Left stick for movement
-    float leftX = SDL_GetGamepadAxis (gamepad, SDL_GAMEPAD_AXIS_LEFTX) / 32767.0f;
+    // Left stick Y for throttle
     float leftY = SDL_GetGamepadAxis (gamepad, SDL_GAMEPAD_AXIS_LEFTY) / 32767.0f;
-
-    moveInput.x = applyDeadzone (leftX);
     moveInput.y = applyDeadzone (leftY);
 
-    // Right stick for aiming
+    // Rudder: combine left stick X, right stick X, and triggers
+    float leftX = SDL_GetGamepadAxis (gamepad, SDL_GAMEPAD_AXIS_LEFTX) / 32767.0f;
     float rightX = SDL_GetGamepadAxis (gamepad, SDL_GAMEPAD_AXIS_RIGHTX) / 32767.0f;
-    float rightY = SDL_GetGamepadAxis (gamepad, SDL_GAMEPAD_AXIS_RIGHTY) / 32767.0f;
+    float leftTrigger = SDL_GetGamepadAxis (gamepad, SDL_GAMEPAD_AXIS_LEFT_TRIGGER) / 32767.0f;
+    float rightTrigger = SDL_GetGamepadAxis (gamepad, SDL_GAMEPAD_AXIS_RIGHT_TRIGGER) / 32767.0f;
 
+    float stickRudder = applyDeadzone (leftX) + applyDeadzone (rightX);
+    float triggerRudder = rightTrigger - leftTrigger; // Right trigger = turn right, left = turn left
+
+    moveInput.x = std::clamp (stickRudder + triggerRudder, -1.0f, 1.0f);
+
+    // Right stick for aiming crosshair
+    float rightY = SDL_GetGamepadAxis (gamepad, SDL_GAMEPAD_AXIS_RIGHTY) / 32767.0f;
     aimInput.x = applyDeadzone (rightX);
     aimInput.y = applyDeadzone (rightY);
 
-    // Right trigger or X button for firing
-    float rightTrigger = SDL_GetGamepadAxis (gamepad, SDL_GAMEPAD_AXIS_RIGHT_TRIGGER) / 32767.0f;
-    bool xButton = SDL_GetGamepadButton (gamepad, SDL_GAMEPAD_BUTTON_WEST); // X on Xbox, Square on PS
-    fireInput = (rightTrigger > 0.5f) || xButton;
+    // Any button fires
+    fireInput = SDL_GetGamepadButton (gamepad, SDL_GAMEPAD_BUTTON_SOUTH) || // A / Cross
+                SDL_GetGamepadButton (gamepad, SDL_GAMEPAD_BUTTON_EAST) || // B / Circle
+                SDL_GetGamepadButton (gamepad, SDL_GAMEPAD_BUTTON_WEST) || // X / Square
+                SDL_GetGamepadButton (gamepad, SDL_GAMEPAD_BUTTON_NORTH) || // Y / Triangle
+                SDL_GetGamepadButton (gamepad, SDL_GAMEPAD_BUTTON_LEFT_SHOULDER) ||
+                SDL_GetGamepadButton (gamepad, SDL_GAMEPAD_BUTTON_RIGHT_SHOULDER);
 }
 
 float Player::applyDeadzone (float value) const

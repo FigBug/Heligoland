@@ -26,9 +26,9 @@ Heligoland is a local multiplayer battleship game where up to 4 players command 
 Each player uses a gamepad:
 
 - **Left Stick Y** - Throttle (forward/reverse)
-- **Left Stick X** - Rudder (turn left/right)
+- **Left/Right Stick X or Triggers** - Rudder (turn left/right)
 - **Right Stick** - Aim crosshair
-- **Right Trigger** - Fire
+- **Any Button** - Fire
 
 Ships without a connected gamepad are controlled by AI.
 

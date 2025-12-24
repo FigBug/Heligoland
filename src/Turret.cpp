@@ -1,4 +1,5 @@
 #include "Turret.h"
+#include <algorithm>
 #include <cmath>
 
 Turret::Turret (Vec2 localOffset_, bool isFrontTurret)
@@ -85,55 +86,79 @@ void Turret::update (float dt, float shipAngle, Vec2 targetDir)
         targetAngle = clampAngleToArc (relativeAngle);
     }
 
-    // Smoothly rotate toward target angle
-    float angleDiff = targetAngle - angle;
-
-    // Normalize angle difference to [-PI, PI]
-    while (angleDiff > pi)
-        angleDiff -= 2.0f * pi;
-    while (angleDiff < -pi)
-        angleDiff += 2.0f * pi;
-
     float maxRotation = rotationSpeed * dt;
-
-    // Check if the short path crosses the forbidden zone
-    // If so, force rotation the long way around
     float arcSize = pi * 0.75f; // 135 degrees
+    float limit = pi - arcSize; // 45 degrees - the forbidden zone boundary
 
-    // Test if rotating in the short direction would hit the forbidden zone
-    float testStep = maxRotation * (angleDiff > 0 ? 1.0f : -1.0f);
-    float testAngle = angle + testStep;
+    // Determine which direction to rotate
+    // We need to check if the shortest path crosses the forbidden zone
 
-    // Normalize test angle
-    while (testAngle > pi)
-        testAngle -= 2.0f * pi;
-    while (testAngle < -pi)
-        testAngle += 2.0f * pi;
+    float cwDist, ccwDist; // clockwise and counter-clockwise distances
 
-    bool wouldHitLimit = false;
+    // Calculate distance going clockwise (negative direction)
+    if (targetAngle <= angle)
+        cwDist = angle - targetAngle;
+    else
+        cwDist = angle + 2.0f * pi - targetAngle;
 
-    if (isFront)
+    // Calculate distance going counter-clockwise (positive direction)
+    ccwDist = 2.0f * pi - cwDist;
+
+    // Check if each path crosses the forbidden zone
+    auto pathCrossesForbidden = [&] (float start, float dist, bool clockwise) -> bool
     {
-        // Front turrets: forbidden zone is beyond ±135°
-        wouldHitLimit = (std::abs (testAngle) > arcSize) && (std::abs (angle) <= arcSize);
+        // Sample points along the path to check if any are in forbidden zone
+        int steps = std::max (2, (int) (dist / 0.1f));
+        for (int i = 1; i < steps; ++i)
+        {
+            float t = (float) i / steps;
+            float testAngle = start + (clockwise ? -1.0f : 1.0f) * dist * t;
+
+            // Normalize
+            while (testAngle > pi)
+                testAngle -= 2.0f * pi;
+            while (testAngle < -pi)
+                testAngle += 2.0f * pi;
+
+            // Check if in forbidden zone
+            if (isFront)
+            {
+                if (std::abs (testAngle) > arcSize)
+                    return true;
+            }
+            else
+            {
+                if (std::abs (testAngle) < limit)
+                    return true;
+            }
+        }
+        return false;
+    };
+
+    bool cwBlocked = pathCrossesForbidden (angle, cwDist, true);
+    bool ccwBlocked = pathCrossesForbidden (angle, ccwDist, false);
+
+    float angleDiff;
+    if (cwBlocked && ! ccwBlocked)
+    {
+        // Must go counter-clockwise
+        angleDiff = ccwDist;
+    }
+    else if (ccwBlocked && ! cwBlocked)
+    {
+        // Must go clockwise
+        angleDiff = -cwDist;
     }
     else
     {
-        // Rear turrets: forbidden zone is near 0 (within ±45°)
-        float limit = pi - arcSize; // 45 degrees
-        wouldHitLimit = (std::abs (testAngle) < limit) && (std::abs (angle) >= limit);
+        // Neither blocked (or both blocked - shouldn't happen), take shortest
+        if (cwDist <= ccwDist)
+            angleDiff = -cwDist;
+        else
+            angleDiff = ccwDist;
     }
 
-    // If short path is blocked, go the long way
-    if (wouldHitLimit)
-    {
-        angleDiff = -angleDiff;
-        // Use the sign of the long way
-        if (std::abs (angleDiff) < pi)
-        {
-            angleDiff = (angleDiff > 0 ? 1.0f : -1.0f) * (2.0f * pi - std::abs (angleDiff));
-        }
-    }
+    // Apply rotation
     if (std::abs (angleDiff) < maxRotation)
     {
         angle = targetAngle;

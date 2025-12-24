@@ -118,6 +118,9 @@ void Game::handleEvents()
 
 void Game::update (float dt)
 {
+    // Update total time for animations
+    time += dt;
+
     // Update players for gamepad detection
     for (auto& player : players)
     {
@@ -504,8 +507,11 @@ void Game::checkCollisions()
             if (! separated)
             {
                 // Collision detected!
+                Vec2 velA = ships[i]->getVelocity();
+                Vec2 velB = ships[j]->getVelocity();
+
                 // Calculate relative speed for damage
-                Vec2 relVel = ships[i]->getVelocity() - ships[j]->getVelocity();
+                Vec2 relVel = velA - velB;
                 float impactSpeed = relVel.length();
 
                 // Damage proportional to impact speed
@@ -513,21 +519,18 @@ void Game::checkCollisions()
                 ships[i]->takeDamage (damage);
                 ships[j]->takeDamage (damage);
 
-                // Determine push direction (from i to j)
+                // Determine collision normal (from i to j)
                 Vec2 diff = ships[j]->getPosition() - ships[i]->getPosition();
                 if (diff.dot (minAxis) < 0)
                 {
                     minAxis = minAxis * -1.0f;
                 }
+                Vec2 collisionNormal = minAxis;
 
-                // Push ships apart and stop them
+                // Push ships apart first
                 float pushDist = minOverlap / 2.0f + 2.0f;
-                ships[i]->stopAndPushApart (minAxis * -1.0f, pushDist);
-                ships[j]->stopAndPushApart (minAxis, pushDist);
-
-                // Full stop both ships (reset throttle)
-                ships[i]->fullStop();
-                ships[j]->fullStop();
+                ships[i]->applyCollision (collisionNormal * -1.0f, pushDist, velA, velB);
+                ships[j]->applyCollision (collisionNormal, pushDist, velB, velA);
             }
         }
     }
@@ -557,7 +560,9 @@ void Game::checkGameOver()
 
 void Game::render()
 {
-    renderer->clear();
+    float w, h;
+    getWindowSize (w, h);
+    renderer->drawWater (time, w, h);
 
     switch (state)
     {
@@ -643,7 +648,7 @@ void Game::renderTitle()
 
     // Draw start instruction
     SDL_Color instructColor = { 150, 150, 150, 255 };
-    renderer->drawTextCentered ("PRESS TRIGGER TO START", { w / 2.0f, h * 0.85f }, 2.0f, instructColor);
+    renderer->drawTextCentered ("PRESS ANY BUTTON TO START", { w / 2.0f, h * 0.85f }, 2.0f, instructColor);
 }
 
 void Game::renderPlaying()

@@ -236,16 +236,35 @@ void Ship::takeDamage (float damage)
     }
 }
 
-void Ship::stopAndPushApart (Vec2 pushDirection, float pushDistance)
+void Ship::applyCollision (Vec2 pushDirection, float pushDistance, Vec2 myVel, Vec2 otherVel)
 {
-    velocity = { 0, 0 };
+    // Push apart to resolve overlap
     position += pushDirection * pushDistance;
-}
 
-void Ship::fullStop()
-{
-    velocity = { 0, 0 };
-    throttle = 0.0f;
+    // Calculate collision response using elastic collision formula
+    // For equal mass objects: v1' = v2 and v2' = v1 along collision normal
+    // We'll use a coefficient of restitution for energy loss
+
+    Vec2 normal = pushDirection.normalized();
+    float restitution = 0.5f; // 0 = perfectly inelastic, 1 = perfectly elastic
+
+    // Relative velocity along collision normal
+    float relVelNormal = (myVel - otherVel).dot (normal);
+
+    // Only resolve if objects are moving toward each other
+    if (relVelNormal < 0)
+    {
+        // For equal masses, the impulse is simpler
+        float impulse = -(1.0f + restitution) * relVelNormal * 0.5f;
+
+        // Apply impulse to velocity
+        velocity = myVel + normal * impulse;
+
+        // Add some rotation based on where the hit occurred
+        // This is simplified - just add some angular velocity
+        float lateralComponent = (myVel - otherVel).dot ({ -normal.y, normal.x });
+        angularVelocity += lateralComponent * 0.01f;
+    }
 }
 
 std::array<Vec2, 4> Ship::getCorners() const

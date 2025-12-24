@@ -4,7 +4,11 @@ cmake_minimum_required(VERSION 3.16)
 set(CMAKE_OSX_DEPLOYMENT_TARGET "13.0" CACHE STRING "Minimum macOS version")
 set(CMAKE_OSX_ARCHITECTURES "arm64;x86_64" CACHE STRING "Build universal binary")
 
-project(Heligoland VERSION 0.1.0 LANGUAGES CXX)
+# Read version from VERSION file
+file(READ "${CMAKE_CURRENT_SOURCE_DIR}/VERSION" VERSION_STRING)
+string(STRIP "${VERSION_STRING}" VERSION_STRING)
+
+project(Heligoland VERSION ${VERSION_STRING} LANGUAGES CXX)
 
 set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
@@ -65,6 +69,9 @@ if(APPLE)
         set_source_files_properties(${ICON_FILE} PROPERTIES MACOSX_PACKAGE_LOCATION "Resources")
         set_target_properties(${PROJECT_NAME} PROPERTIES MACOSX_BUNDLE_ICON_FILE "icon.icns")
     endif()
+elseif(WIN32)
+    set(RC_FILE ${CMAKE_CURRENT_SOURCE_DIR}/icon.rc)
+    add_executable(${PROJECT_NAME} ${SOURCES} ${HEADERS} ${RC_FILE})
 else()
     add_executable(${PROJECT_NAME} ${SOURCES} ${HEADERS})
 endif()
@@ -85,7 +92,6 @@ elseif(APPLE)
         MACOSX_BUNDLE_GUI_IDENTIFIER "com.heligoland.game"
         MACOSX_BUNDLE_BUNDLE_VERSION "${PROJECT_VERSION}"
         MACOSX_BUNDLE_SHORT_VERSION_STRING "${PROJECT_VERSION}"
-        MACOSX_BUNDLE_ICON_FILE "Heligoland.icns"
     )
     target_link_libraries(${PROJECT_NAME} PRIVATE
         "-framework Cocoa"

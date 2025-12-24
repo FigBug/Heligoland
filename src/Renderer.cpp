@@ -16,6 +16,12 @@ void Renderer::clear()
     SDL_RenderClear (renderer);
 }
 
+void Renderer::drawWater (float, float, float)
+{
+    SDL_SetRenderDrawColor (renderer, 30, 60, 90, 255);
+    SDL_RenderClear (renderer);
+}
+
 void Renderer::present()
 {
     SDL_RenderPresent (renderer);

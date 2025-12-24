@@ -56,6 +56,7 @@ private:
     int winnerIndex = -1;
     float gameOverTimer = 0.0f;
     float gameStartDelay = 0.0f; // Delay before accepting fire input after game starts
+    float time = 0.0f; // Total elapsed time for animations
     Uint64 lastFrameTime = 0;
 
     std::array<std::unique_ptr<Ship>, NUM_SHIPS> ships;

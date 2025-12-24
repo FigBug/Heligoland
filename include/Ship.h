@@ -53,8 +53,7 @@ public:
     // Collision
     Vec2 getVelocity() const { return velocity; }
     float getSpeed() const { return velocity.length(); }
-    void stopAndPushApart (Vec2 pushDirection, float pushDistance);
-    void fullStop(); // Stop ship and reset throttle
+    void applyCollision (Vec2 pushDirection, float pushDistance, Vec2 myVel, Vec2 otherVel);
     std::array<Vec2, 4> getCorners() const; // Get 4 corners for OBB collision
 
     // HUD info
