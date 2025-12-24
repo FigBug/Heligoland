@@ -37,6 +37,7 @@ if(WIN32)
 endif()
 
 set(HEADERS
+    src/Config.h
     src/Game.h
     src/Ship.h
     src/Turret.h

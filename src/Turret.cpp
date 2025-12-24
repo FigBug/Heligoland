@@ -1,4 +1,5 @@
 #include "Turret.h"
+#include "Config.h"
 #include <algorithm>
 #include <cmath>
 
@@ -31,7 +32,7 @@ float Turret::clampAngleToArc (float desiredAngle) const
     while (desiredAngle < -pi)
         desiredAngle += 2.0f * pi;
 
-    float arcSize = pi * 0.75f; // 135 degrees each direction
+    float arcSize = pi * Config::turretArcSize;
 
     if (isFront)
     {
@@ -87,8 +88,8 @@ void Turret::update (float dt, float shipAngle, Vec2 targetDir)
     }
 
     float maxRotation = rotationSpeed * dt;
-    float arcSize = pi * 0.75f; // 135 degrees
-    float limit = pi - arcSize; // 45 degrees - the forbidden zone boundary
+    float arcSize = pi * Config::turretArcSize;
+    float limit = pi - arcSize; // The forbidden zone boundary
 
     // Determine which direction to rotate
     // We need to check if the shortest path crosses the forbidden zone
@@ -193,8 +194,7 @@ bool Turret::isAimedAtTarget() const
     while (angleDiff < -pi)
         angleDiff += 2.0f * pi;
 
-    // Consider on target if within ~5 degrees
-    return std::abs (angleDiff) < 0.09f;
+    return std::abs (angleDiff) < Config::turretOnTargetTolerance;
 }
 
 bool Turret::isOnTarget() const
@@ -205,7 +205,7 @@ bool Turret::isOnTarget() const
 
 bool Turret::isAtArcLimit() const
 {
-    float arcSize = pi * 0.75f; // 135 degrees
+    float arcSize = pi * Config::turretArcSize;
     float tolerance = 0.05f;
 
     if (isFront)

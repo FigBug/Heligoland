@@ -180,14 +180,14 @@ void Game::startGame()
     explosions.clear();
     winnerIndex = -1;
     gameOverTimer = 0.0f;
-    gameStartDelay = 0.5f; // Ignore fire input for first 0.5 seconds
+    gameStartDelay = Config::gameStartDelay;
 
-    // Initialize wind (minimum 25% strength)
+    // Initialize wind (minimum strength)
     float windAngle = ((float) rand() / RAND_MAX) * 2.0f * pi;
-    float windStrength = 0.25f + ((float) rand() / RAND_MAX) * 0.75f;
+    float windStrength = Config::windMinStrength + ((float) rand() / RAND_MAX) * (1.0f - Config::windMinStrength);
     wind = Vec2::fromAngle (windAngle) * windStrength;
     targetWind = wind;
-    windChangeTimer = WIND_CHANGE_INTERVAL;
+    windChangeTimer = Config::windChangeInterval;
 
     state = GameState::Playing;
 }
@@ -199,23 +199,22 @@ void Game::updateWind (float dt)
     if (windChangeTimer <= 0)
     {
         // Pick new target wind - minor adjustment from current wind
-        // Small angle change (up to 30 degrees either way)
         float currentAngle = std::atan2 (wind.y, wind.x);
-        float angleChange = ((float) rand() / RAND_MAX - 0.5f) * pi / 3.0f; // +/- 30 degrees
+        float angleChange = ((float) rand() / RAND_MAX - 0.5f) * Config::windAngleChangeMax * 2.0f;
         float newAngle = currentAngle + angleChange;
 
-        // Small strength change (up to 20% either way), minimum 25%
+        // Small strength change, minimum strength enforced
         float currentStrength = wind.length();
-        float strengthChange = ((float) rand() / RAND_MAX - 0.5f) * 0.4f;
-        float newStrength = std::clamp (currentStrength + strengthChange, 0.25f, 1.0f);
+        float strengthChange = ((float) rand() / RAND_MAX - 0.5f) * Config::windStrengthChangeMax;
+        float newStrength = std::clamp (currentStrength + strengthChange, Config::windMinStrength, 1.0f);
 
         targetWind = Vec2::fromAngle (newAngle) * newStrength;
-        windChangeTimer = WIND_CHANGE_INTERVAL;
+        windChangeTimer = Config::windChangeInterval;
     }
 
     // Slowly lerp wind toward target
-    wind.x += (targetWind.x - wind.x) * WIND_LERP_SPEED * dt;
-    wind.y += (targetWind.y - wind.y) * WIND_LERP_SPEED * dt;
+    wind.x += (targetWind.x - wind.x) * Config::windLerpSpeed * dt;
+    wind.y += (targetWind.y - wind.y) * Config::windLerpSpeed * dt;
 }
 
 void Game::updatePlaying (float dt)
@@ -311,7 +310,7 @@ void Game::updatePlaying (float dt)
             }
         }
         float avgThrottle = aliveCount > 0 ? totalThrottle / aliveCount : 0.0f;
-        audio->setEngineVolume (0.3f + avgThrottle * 0.7f); // Base volume + throttle boost
+        audio->setEngineVolume (Config::audioEngineBaseVolume + avgThrottle * Config::audioEngineThrottleBoost);
     }
 
     // Update shells
@@ -375,7 +374,7 @@ void Game::updateGameOver (float dt)
         explosions.end());
 
     gameOverTimer += dt;
-    if (gameOverTimer >= GAME_OVER_RETURN_DELAY)
+    if (gameOverTimer >= Config::gameOverReturnDelay)
     {
         returnToTitle();
     }
@@ -395,9 +394,9 @@ void Game::returnToTitle()
 
 void Game::updateShells (float dt)
 {
-    // Calculate wind drift force (5% of shell speed at max wind)
-    // Shell speed is roughly 200, so max drift is 200 * 0.05 = 10 per second
-    Vec2 windDrift = wind * 200.0f * MAX_WIND_DRIFT;
+    // Calculate wind drift force based on shell speed and max wind drift
+    float shellSpeed = Config::shipMaxSpeed * Config::shellSpeedMultiplier;
+    Vec2 windDrift = wind * shellSpeed * Config::windMaxDrift;
 
     for (auto& shell : shells)
     {
@@ -438,7 +437,7 @@ void Game::checkCollisions()
                 float arenaWidth, arenaHeight;
                 getWindowSize (arenaWidth, arenaHeight);
 
-                ship->takeDamage (SHELL_DAMAGE);
+                ship->takeDamage (Config::shellDamage);
 
                 // Spawn hit explosion
                 Explosion explosion;
@@ -459,8 +458,8 @@ void Game::checkCollisions()
                     Explosion sinkExplosion;
                     sinkExplosion.position = ship->getPosition();
                     sinkExplosion.isHit = true;
-                    sinkExplosion.maxRadius = 80.0f;
-                    sinkExplosion.duration = 1.0f;
+                    sinkExplosion.maxRadius = Config::sinkExplosionMaxRadius;
+                    sinkExplosion.duration = Config::sinkExplosionDuration;
                     explosions.push_back (sinkExplosion);
                 }
 
@@ -573,7 +572,7 @@ void Game::checkCollisions()
                 ships[j]->takeDamage (damage);
 
                 // Play collision sound at midpoint between ships
-                if (audio && impactSpeed > 10.0f) // Only play for significant impacts
+                if (audio && impactSpeed > Config::aiMinImpactForSound)
                 {
                     float arenaWidth, arenaHeight;
                     getWindowSize (arenaWidth, arenaHeight);
@@ -703,11 +702,9 @@ void Game::renderTitle()
     getWindowSize (w, h);
 
     // Draw title
-    Color titleColor = { 255, 255, 255, 255 };
-    renderer->drawTextCentered ("HELIGOLAND", { w / 2.0f, h / 3.0f }, 8.0f, titleColor);
+    renderer->drawTextCentered ("HELIGOLAND", { w / 2.0f, h / 3.0f }, 8.0f, Config::colorTitle);
 
     // Draw connected players
-    Color subtitleColor = { 200, 200, 200, 255 };
     int connectedCount = 0;
     for (auto& player : players)
     {
@@ -718,15 +715,13 @@ void Game::renderTitle()
     }
 
     std::string playerText = std::to_string (connectedCount) + " PLAYERS CONNECTED";
-    renderer->drawTextCentered (playerText, { w / 2.0f, h * 0.45f }, 3.0f, subtitleColor);
+    renderer->drawTextCentered (playerText, { w / 2.0f, h * 0.45f }, 3.0f, Config::colorSubtitle);
 
     // Draw game mode selector
-    Color modeColor = { 255, 220, 100, 255 };
     std::string modeText = gameMode == GameMode::FFA ? "FREE FOR ALL" : "2 VS 2";
-    renderer->drawTextCentered (modeText, { w / 2.0f, h * 0.55f }, 4.0f, modeColor);
+    renderer->drawTextCentered (modeText, { w / 2.0f, h * 0.55f }, 4.0f, Config::colorModeText);
 
-    Color modeHintColor = { 120, 120, 120, 255 };
-    renderer->drawTextCentered ("LEFT - RIGHT TO CHANGE MODE", { w / 2.0f, h * 0.62f }, 1.5f, modeHintColor);
+    renderer->drawTextCentered ("LEFT - RIGHT TO CHANGE MODE", { w / 2.0f, h * 0.62f }, 1.5f, Config::colorGreySubtle);
 
     // Draw player slots
     float slotY = h * 0.72f;
@@ -744,35 +739,34 @@ void Game::renderTitle()
             switch (i)
             {
                 case 0:
-                    slotColor = { 255, 100, 100, 255 };
-                    break; // Red
+                    slotColor = Config::colorShipRed;
+                    break;
                 case 1:
-                    slotColor = { 100, 100, 255, 255 };
-                    break; // Blue
+                    slotColor = Config::colorShipBlue;
+                    break;
                 case 2:
-                    slotColor = { 100, 255, 100, 255 };
-                    break; // Green
+                    slotColor = Config::colorShipGreen;
+                    break;
                 case 3:
-                    slotColor = { 255, 255, 100, 255 };
-                    break; // Yellow
+                    slotColor = Config::colorShipYellow;
+                    break;
                 default:
-                    slotColor = { 200, 200, 200, 255 };
+                    slotColor = Config::colorGrey;
                     break;
             }
             renderer->drawFilledRect ({ slotPos.x - 25, slotPos.y - 25 }, 50, 50, slotColor);
-            renderer->drawTextCentered ("P" + std::to_string (i + 1), slotPos, 3.0f, { 0, 0, 0, 255 });
+            renderer->drawTextCentered ("P" + std::to_string (i + 1), slotPos, 3.0f, Config::colorBlack);
         }
         else
         {
-            slotColor = { 80, 80, 80, 255 };
+            slotColor = Config::colorGreyDark;
             renderer->drawRect ({ slotPos.x - 25, slotPos.y - 25 }, 50, 50, slotColor);
             renderer->drawTextCentered ("AI", slotPos, 2.0f, slotColor);
         }
     }
 
     // Draw start instruction
-    Color instructColor = { 150, 150, 150, 255 };
-    renderer->drawTextCentered ("CLICK OR PRESS ANY BUTTON TO START", { w / 2.0f, h * 0.90f }, 2.0f, instructColor);
+    renderer->drawTextCentered ("CLICK OR PRESS ANY BUTTON TO START", { w / 2.0f, h * 0.90f }, 2.0f, Config::colorInstruction);
 }
 
 void Game::renderPlaying()
@@ -873,7 +867,7 @@ void Game::renderPlaying()
 void Game::renderGameOver()
 {
     // Wait before showing text so player can see the final explosion
-    if (gameOverTimer < GAME_OVER_TEXT_DELAY)
+    if (gameOverTimer < Config::gameOverTextDelay)
     {
         return;
     }
@@ -881,8 +875,8 @@ void Game::renderGameOver()
     float w, h;
     getWindowSize (w, h);
 
-    Color textColor = { 255, 255, 255, 255 };
-    Color statsColor = { 200, 200, 200, 255 };
+    Color textColor = Config::colorWhite;
+    Color statsColor = Config::colorSubtitle;
 
     if (winnerIndex >= 0)
     {

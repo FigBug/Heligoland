@@ -1,5 +1,6 @@
 #pragma once
 
+#include "Config.h"
 #include "Vec2.h"
 
 class Shell
@@ -23,9 +24,9 @@ private:
     Vec2 startPosition;
     Vec2 velocity;
     int ownerIndex; // Which player fired this shell
-    float radius = 3.0f;
-    float splashRadius = 8.0f; // Hit detection radius when shell lands
+    float radius = Config::shellRadius;
+    float splashRadius = Config::shellSplashRadius;
     bool alive = true;
     bool landed = false; // True when shell reaches target range
-    float targetRange = 150.0f; // Distance shell travels before landing
+    float targetRange = 150.0f; // Distance shell travels before landing (set by constructor)
 };

@@ -1,5 +1,6 @@
 #pragma once
 
+#include "Config.h"
 #include "Vec2.h"
 
 class Ship;
@@ -22,7 +23,7 @@ private:
 
     Vec2 wanderTarget;
     float wanderTimer = 0.0f;
-    float wanderInterval = 3.0f;
+    float wanderInterval = Config::aiWanderInterval;
 
     void updateWander (float dt, const Ship& myShip, float arenaWidth, float arenaHeight);
     void updateAim (const Ship& myShip, const Ship* targetShip);

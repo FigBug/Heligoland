@@ -2,6 +2,7 @@
 
 #include "AIController.h"
 #include "Audio.h"
+#include "Config.h"
 #include "Player.h"
 #include "Renderer.h"
 #include "Shell.h"
@@ -27,8 +28,8 @@ struct Explosion
 {
     Vec2 position;
     float timer = 0.0f;
-    float duration = 0.5f;
-    float maxRadius = 30.0f;
+    float duration = Config::explosionDuration;
+    float maxRadius = Config::explosionMaxRadius;
     bool isHit = false; // true = explosion (orange), false = splash (blue)
 
     float getProgress() const { return timer / duration; }
@@ -49,9 +50,6 @@ private:
     static constexpr int WINDOW_WIDTH = 1280;
     static constexpr int WINDOW_HEIGHT = 720;
     static constexpr int NUM_SHIPS = 4;
-    static constexpr float SHELL_DAMAGE = 100.0f;
-    static constexpr float GAME_OVER_TEXT_DELAY = 5.0f; // Delay before showing winner text
-    static constexpr float GAME_OVER_RETURN_DELAY = 8.0f; // Total delay before returning to title
 
     std::unique_ptr<Renderer> renderer;
     std::unique_ptr<Audio> audio;
@@ -75,9 +73,6 @@ private:
     Vec2 wind; // Current wind direction and strength (length = strength 0-1)
     Vec2 targetWind; // Wind is slowly moving toward this target
     float windChangeTimer = 0.0f;
-    static constexpr float WIND_CHANGE_INTERVAL = 60.0f; // Seconds between wind target changes
-    static constexpr float WIND_LERP_SPEED = 0.05f; // How fast wind changes (very gradual)
-    static constexpr float MAX_WIND_DRIFT = 0.01f; // 1% max drift
 
     // Win tracking
     std::array<int, NUM_SHIPS> playerWins = {}; // Wins per player in FFA mode

@@ -1,3 +1,7 @@
+0.0.6
+- Slowed ships
+- Increased firing timeout
+
 0.0.5
 - Added 2v2 game mode
 - Switched from SDL to Raylib

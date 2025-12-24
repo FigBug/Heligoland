@@ -1,5 +1,6 @@
 #pragma once
 
+#include "Config.h"
 #include "Vec2.h"
 
 class Turret
@@ -22,9 +23,9 @@ private:
     Vec2 localOffset; // Position relative to ship center
     float angle = 0.0f; // Current turret rotation relative to ship (radians)
     float targetAngle = 0.0f;
-    float rotationSpeed = 1.0f; // Radians per second
-    float radius = 5.0f;
-    float barrelLength = 8.0f;
+    float rotationSpeed = Config::turretRotationSpeed;
+    float radius = Config::turretRadius;
+    float barrelLength = Config::turretBarrelLength;
     bool isFront = true; // Front turrets can't point backward, rear can't point forward
 
     float clampAngleToArc (float desiredAngle) const;

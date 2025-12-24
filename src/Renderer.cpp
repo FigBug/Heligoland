@@ -1,4 +1,5 @@
 #include "Renderer.h"
+#include "Config.h"
 #include "Game.h"
 #include "Shell.h"
 #include "Ship.h"
@@ -24,13 +25,13 @@ Renderer::~Renderer()
 
 void Renderer::clear()
 {
-    ClearBackground ({ 30, 60, 90, 255 }); // Dark ocean blue
+    ClearBackground (Config::colorOcean);
 }
 
 void Renderer::drawWater (float time, float screenWidth, float screenHeight)
 {
     // Base ocean color
-    ClearBackground ({ 30, 60, 90, 255 });
+    ClearBackground (Config::colorOcean);
 
     // Texture is displayed at 1.5x scale for larger coverage
     float tileSize = noiseTextureSize * 1.5f;
@@ -126,7 +127,7 @@ void Renderer::drawShip (const Ship& ship)
         // Draw barrel (line from turret center outward)
         float turretAngle = turret.getWorldAngle (angle);
         Vec2 barrelEnd = turretPos + Vec2::fromAngle (turretAngle) * turret.getBarrelLength();
-        Color barrelColor = { 50, 50, 50, (unsigned char) (255 * alpha) };
+        Color barrelColor = { Config::colorBarrel.r, Config::colorBarrel.g, Config::colorBarrel.b, (unsigned char) (255 * alpha) };
         drawLine (turretPos, barrelEnd, barrelColor);
     }
 }
@@ -143,9 +144,9 @@ void Renderer::drawBubbleTrail (const Ship& ship)
 
 void Renderer::drawSmoke (const Ship& ship)
 {
-    // Smoke darkens as ship sinks (from grey 40 to near-black 10)
+    // Smoke lightens as ship sinks
     float sinkProgress = ship.getSinkProgress();
-    unsigned char greyValue = (unsigned char) (40 - sinkProgress * 30); // 40 -> 10
+    unsigned char greyValue = (unsigned char) (Config::smokeGreyStart + sinkProgress * (Config::smokeGreyEnd - Config::smokeGreyStart));
 
     for (const auto& s : ship.getSmoke())
     {
@@ -157,8 +158,7 @@ void Renderer::drawSmoke (const Ship& ship)
 
 void Renderer::drawShell (const Shell& shell)
 {
-    Color color = { 255, 200, 50, 255 };
-    drawFilledCircle (shell.getPosition(), shell.getRadius(), color);
+    drawFilledCircle (shell.getPosition(), shell.getRadius(), Config::colorShell);
 }
 
 void Renderer::drawExplosion (const Explosion& explosion)
@@ -172,36 +172,36 @@ void Renderer::drawExplosion (const Explosion& explosion)
     if (explosion.isHit)
     {
         // Hit explosion - orange/yellow
-        Color outerColor = { 255, 150, 50, (unsigned char) (alpha * 200) };
+        Color outerColor = { Config::colorExplosionOuter.r, Config::colorExplosionOuter.g, Config::colorExplosionOuter.b, (unsigned char) (alpha * Config::colorExplosionOuter.a) };
         drawCircle (explosion.position, radius, outerColor);
 
         if (radius > 5.0f)
         {
-            Color midColor = { 255, 220, 100, (unsigned char) (alpha * 180) };
+            Color midColor = { Config::colorExplosionMid.r, Config::colorExplosionMid.g, Config::colorExplosionMid.b, (unsigned char) (alpha * Config::colorExplosionMid.a) };
             drawCircle (explosion.position, radius * 0.7f, midColor);
         }
 
         if (radius > 10.0f)
         {
-            Color coreColor = { 255, 255, 200, (unsigned char) (alpha * 150) };
+            Color coreColor = { Config::colorExplosionCore.r, Config::colorExplosionCore.g, Config::colorExplosionCore.b, (unsigned char) (alpha * Config::colorExplosionCore.a) };
             drawFilledCircle (explosion.position, radius * 0.3f, coreColor);
         }
     }
     else
     {
         // Miss splash - blue/white
-        Color outerColor = { 100, 150, 255, (unsigned char) (alpha * 200) };
+        Color outerColor = { Config::colorSplashOuter.r, Config::colorSplashOuter.g, Config::colorSplashOuter.b, (unsigned char) (alpha * Config::colorSplashOuter.a) };
         drawCircle (explosion.position, radius, outerColor);
 
         if (radius > 5.0f)
         {
-            Color midColor = { 150, 200, 255, (unsigned char) (alpha * 180) };
+            Color midColor = { Config::colorSplashMid.r, Config::colorSplashMid.g, Config::colorSplashMid.b, (unsigned char) (alpha * Config::colorSplashMid.a) };
             drawCircle (explosion.position, radius * 0.7f, midColor);
         }
 
         if (radius > 10.0f)
         {
-            Color coreColor = { 220, 240, 255, (unsigned char) (alpha * 150) };
+            Color coreColor = { Config::colorSplashCore.r, Config::colorSplashCore.g, Config::colorSplashCore.b, (unsigned char) (alpha * Config::colorSplashCore.a) };
             drawFilledCircle (explosion.position, radius * 0.3f, coreColor);
         }
     }
@@ -213,7 +213,7 @@ void Renderer::drawCrosshair (const Ship& ship)
     Color shipColor = ship.getColor();
 
     // Crosshair is grey if not ready to fire
-    Color crosshairColor = ship.isReadyToFire() ? shipColor : Color { 100, 100, 100, 255 };
+    Color crosshairColor = ship.isReadyToFire() ? shipColor : Config::colorGreyMid;
 
     float size = 15.0f;
 
@@ -228,11 +228,10 @@ void Renderer::drawCrosshair (const Ship& ship)
     float barWidth = 40.0f;
     float barHeight = 4.0f;
     float barY = position.y + size + 8.0f;
-    Color barBg = { 60, 60, 60, 255 };
-    drawFilledRect ({ position.x - barWidth / 2.0f, barY }, barWidth, barHeight, barBg);
+    drawFilledRect ({ position.x - barWidth / 2.0f, barY }, barWidth, barHeight, Config::colorBarBackground);
 
     float reloadPct = ship.getReloadProgress();
-    Color reloadColor = reloadPct >= 1.0f ? Color { 100, 255, 100, 255 } : Color { 255, 100, 100, 255 };
+    Color reloadColor = reloadPct >= 1.0f ? Config::colorReloadReady : Config::colorReloadNotReady;
     drawFilledRect ({ position.x - barWidth / 2.0f, barY }, barWidth * reloadPct, barHeight, reloadColor);
 
     // Draw 4 turret indicator circles below reload bar
@@ -245,7 +244,7 @@ void Renderer::drawCrosshair (const Ship& ship)
     for (int i = 0; i < 4; ++i)
     {
         Vec2 circlePos = { startX + i * circleSpacing, circleY };
-        Color circleColor = turrets[i].isAimedAtTarget() ? shipColor : Color { 60, 60, 60, 255 };
+        Color circleColor = turrets[i].isAimedAtTarget() ? shipColor : Config::colorBarBackground;
         drawFilledCircle (circlePos, circleRadius, circleColor);
     }
 }
@@ -263,9 +262,9 @@ void Renderer::drawShipHUD (const Ship& ship, int slot, int totalSlots, float sc
     unsigned char a = (unsigned char) (alpha * 255);
 
     Color shipColor = { ship.getColor().r, ship.getColor().g, ship.getColor().b, a };
-    Color bgColor = { 30, 30, 30, (unsigned char) (alpha * 200) };
-    Color barBg = { 60, 60, 60, a };
-    Color white = { 255, 255, 255, a };
+    Color bgColor = { Config::colorHudBackground.r, Config::colorHudBackground.g, Config::colorHudBackground.b, (unsigned char) (alpha * Config::colorHudBackground.a) };
+    Color barBg = { Config::colorBarBackground.r, Config::colorBarBackground.g, Config::colorBarBackground.b, a };
+    Color white = { Config::colorWhite.r, Config::colorWhite.g, Config::colorWhite.b, a };
 
     // Background
     drawFilledRect ({ x, y }, hudWidth, hudHeight, bgColor);
@@ -291,7 +290,7 @@ void Renderer::drawShipHUD (const Ship& ship, int slot, int totalSlots, float sc
     drawFilledRect ({ barX, throttleY }, barWidth, barHeight, barBg);
     float throttle = ship.getThrottle();
     float throttleCenter = barX + barWidth / 2.0f;
-    Color throttleColor = { 100, 150, 255, a };
+    Color throttleColor = { Config::colorThrottleBar.r, Config::colorThrottleBar.g, Config::colorThrottleBar.b, a };
     if (throttle > 0)
     {
         drawFilledRect ({ throttleCenter, throttleY }, barWidth / 2.0f * throttle, barHeight, throttleColor);
@@ -309,7 +308,7 @@ void Renderer::drawShipHUD (const Ship& ship, int slot, int totalSlots, float sc
     drawFilledRect ({ barX, rudderY }, barWidth, barHeight, barBg);
     float rudder = ship.getRudder();
     float rudderCenter = barX + barWidth / 2.0f;
-    Color rudderColor = { 255, 200, 100, a };
+    Color rudderColor = { Config::colorRudderBar.r, Config::colorRudderBar.g, Config::colorRudderBar.b, a };
     if (rudder > 0)
     {
         drawFilledRect ({ rudderCenter, rudderY }, barWidth / 2.0f * rudder, barHeight, rudderColor);
@@ -330,9 +329,8 @@ void Renderer::drawWindIndicator (Vec2 wind, float screenWidth, float screenHeig
     Vec2 center = { screenWidth - 35, 35 };
 
     // Background circle
-    Color bgColor = { 30, 30, 30, 200 };
-    drawFilledCircle (center, indicatorSize, bgColor);
-    drawCircle (center, indicatorSize, { 100, 100, 100, 255 });
+    drawFilledCircle (center, indicatorSize, Config::colorWindBackground);
+    drawCircle (center, indicatorSize, Config::colorWindBorder);
 
     // Wind arrow
     float windStrength = wind.length();
@@ -344,19 +342,18 @@ void Renderer::drawWindIndicator (Vec2 wind, float screenWidth, float screenHeig
         Vec2 arrowEnd = center + windDir * arrowLength;
 
         // Arrow shaft
-        Color arrowColor = { 200, 200, 255, 255 };
-        drawLine (center, arrowEnd, arrowColor);
+        drawLine (center, arrowEnd, Config::colorWindArrow);
 
         // Arrow head
         float headSize = 4.0f;
         Vec2 head1 = arrowEnd - windDir * headSize + Vec2::fromAngle (windDir.toAngle() + pi * 0.5f) * headSize * 0.5f;
         Vec2 head2 = arrowEnd - windDir * headSize - Vec2::fromAngle (windDir.toAngle() + pi * 0.5f) * headSize * 0.5f;
-        drawLine (arrowEnd, head1, arrowColor);
-        drawLine (arrowEnd, head2, arrowColor);
+        drawLine (arrowEnd, head1, Config::colorWindArrow);
+        drawLine (arrowEnd, head2, Config::colorWindArrow);
     }
 
     // Label
-    drawText ("WIND", { center.x - 6, center.y + indicatorSize + 3 }, 0.75f, { 150, 150, 150, 255 });
+    drawText ("WIND", { center.x - 6, center.y + indicatorSize + 3 }, 0.75f, Config::colorGreyLight);
 }
 
 void Renderer::drawOval (Vec2 center, float width, float height, float angle, Color color)
@@ -711,17 +708,17 @@ void Renderer::createNoiseTexture()
                 if (r < 8)
                 {
                     // Bright highlight (8%)
-                    pixelColor = { 255, 255, 255, 30 };
+                    pixelColor = Config::colorWaterHighlight1;
                 }
                 else if (r < 20)
                 {
                     // Medium highlight (12%)
-                    pixelColor = { 220, 220, 255, 20 };
+                    pixelColor = Config::colorWaterHighlight2;
                 }
                 else if (r < 35)
                 {
                     // Subtle highlight (15%)
-                    pixelColor = { 180, 200, 220, 12 };
+                    pixelColor = Config::colorWaterHighlight3;
                 }
 
                 ImageDrawPixel (&noiseImage, x, y, pixelColor);

@@ -1,5 +1,6 @@
 #pragma once
 
+#include "Config.h"
 #include "Shell.h"
 #include "Turret.h"
 #include "Vec2.h"
@@ -49,8 +50,8 @@ public:
     float getMaxHealth() const { return maxHealth; }
     bool isAlive() const { return health > 0 || isSinking(); }
     bool isSinking() const { return sinking; }
-    bool isFullySunk() const { return sinking && sinkTimer >= sinkDuration; }
-    float getSinkProgress() const { return sinking ? sinkTimer / sinkDuration : 0.0f; }
+    bool isFullySunk() const { return sinking && sinkTimer >= Config::shipSinkDuration; }
+    float getSinkProgress() const { return sinking ? sinkTimer / Config::shipSinkDuration : 0.0f; }
     void takeDamage (float damage);
 
     // Collision
@@ -63,9 +64,9 @@ public:
     float getThrottle() const { return throttle; }
     float getRudder() const { return rudder; }
     float getCrosshairDistance() const; // Distance from ship to crosshair
-    float getReloadProgress() const { return 1.0f - (fireTimer / fireInterval); }
+    float getReloadProgress() const { return 1.0f - (fireTimer / Config::fireInterval); }
     bool isReadyToFire() const; // True if reloaded AND turrets on target AND in range
-    bool isCrosshairInRange() const { return crosshairOffset.length() >= minShellRange; }
+    bool isCrosshairInRange() const { return crosshairOffset.length() >= Config::minShellRange; }
 
 private:
     int playerIndex;
@@ -75,44 +76,34 @@ private:
     float angle = 0.0f; // Ship facing direction (radians)
     float angularVelocity = 0.0f;
 
-    float length = 50.0f;
-    float width = 15.0f;
-
-    float maxSpeed = 10.0f;
-    float throttleRate = 0.5f; // How fast throttle changes per second
-    float rudderRate = 2.0f; // How fast rudder moves
-    float rudderReturn = 3.0f; // How fast rudder returns to center
+    float length = Config::shipLength;
+    float width = Config::shipWidth;
+    float maxSpeed = Config::shipMaxSpeed;
 
     float throttle = 0.0f; // -1 to 1 (current throttle position)
     float rudder = 0.0f; // -1 to 1 (current rudder position)
 
     Vec2 crosshairOffset; // Offset from ship position (moves with aim stick)
-    float crosshairSpeed = 150.0f; // How fast crosshair moves
-    float minShellRange = 50.0f; // Minimum range shells can travel
-    float maxCrosshairDist = 300.0f;
 
     std::array<Turret, 4> turrets;
 
     std::vector<Bubble> bubbles;
     float bubbleSpawnTimer = 0.0f;
-    float bubbleSpawnInterval = 0.02f;
 
     std::vector<Smoke> smoke;
     float smokeSpawnTimer = 0.0f;
 
     // Health
-    float health = 1000.0f;
-    float maxHealth = 1000.0f;
+    float health = Config::shipMaxHealth;
+    float maxHealth = Config::shipMaxHealth;
 
     // Sinking
     bool sinking = false;
     float sinkTimer = 0.0f;
-    static constexpr float sinkDuration = 30.0f;
 
     // Shooting
     std::vector<Shell> pendingShells; // Shells to be added to game
     float fireTimer = 0.0f;
-    float fireInterval = 10.0f; // Time between shots
 
     void clampToArena (float arenaWidth, float arenaHeight);
     void updateBubbles (float dt);

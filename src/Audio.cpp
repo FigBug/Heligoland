@@ -1,4 +1,5 @@
 #include "Audio.h"
+#include "Config.h"
 #include <cmath>
 
 #ifdef __APPLE__
@@ -169,7 +170,7 @@ void Audio::playCannon (float screenX, float screenWidth)
         return;
 
     playWithVariation (cannonSound, screenX, screenWidth);
-    gunSilenceTimer = gunSilenceDuration;
+    gunSilenceTimer = Config::audioGunSilenceDuration;
 }
 
 void Audio::playSplash (float screenX, float screenWidth)

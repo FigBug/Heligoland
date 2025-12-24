@@ -48,6 +48,9 @@ jobs:
         with:
           submodules: recursive
 
+      - name: Install NSIS
+        run: choco install nsis -y
+
       - name: Build and Package
         shell: bash
         run: |

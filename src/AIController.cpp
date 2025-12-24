@@ -1,4 +1,5 @@
 #include "AIController.h"
+#include "Config.h"
 #include "Ship.h"
 #include <algorithm>
 #include <cmath>
@@ -22,7 +23,7 @@ void AIController::updateWander (float dt, const Ship& myShip, float arenaWidth,
     if (wanderTimer <= 0.0f)
     {
         // Pick a new random target within the arena
-        float margin = 150.0f;
+        float margin = Config::aiWanderMargin;
         wanderTarget.x = margin + (rand() / (float) RAND_MAX) * (arenaWidth - 2 * margin);
         wanderTarget.y = margin + (rand() / (float) RAND_MAX) * (arenaHeight - 2 * margin);
         wanderTimer = wanderInterval + (rand() / (float) RAND_MAX) * 2.0f;
@@ -35,7 +36,7 @@ void AIController::updateWander (float dt, const Ship& myShip, float arenaWidth,
     float shipLength = myShip.getLength();
 
     // Look ahead based on speed - predict where we'll be
-    float lookAheadTime = 2.0f; // Look 2 seconds ahead
+    float lookAheadTime = Config::aiLookAheadTime;
     Vec2 futurePos = pos + vel * lookAheadTime;
 
     // Calculate danger margin - larger when moving faster
@@ -200,7 +201,7 @@ void AIController::updateAim (const Ship& myShip, const Ship* targetShip)
             }
 
             // Fire if crosshair is close to predicted position and ship is ready
-            fireInput = crosshairDist < 30.0f && distance < 400.0f && myShip.isReadyToFire();
+            fireInput = crosshairDist < Config::aiCrosshairTolerance && distance < Config::aiFireDistance && myShip.isReadyToFire();
         }
         else
         {
