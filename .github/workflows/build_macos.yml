@@ -48,14 +48,14 @@ jobs:
           codesign --deep --force --verify --verbose --timestamp \
             --options runtime \
             --sign "$DEV_ID" \
-            build/Release/Heligoland.app
+            build/Heligoland.app
         env:
           DEV_ID: ${{ secrets.DEV_ID }}
 
       - name: Notarize Application
         if: env.HAS_SIGNING == 'true'
         run: |
-          cd build/Release
+          cd build
           zip -r Heligoland.zip Heligoland.app
 
           xcrun notarytool submit \
