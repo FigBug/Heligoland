@@ -105,10 +105,10 @@ void Ship::update (float dt, Vec2 moveInput, Vec2 aimInput, bool fireInput, floa
     angle += angularVelocity * dt;
 
     // Keep angle in [-PI, PI]
-    while (angle > M_PI)
-        angle -= 2.0f * M_PI;
-    while (angle < -M_PI)
-        angle += 2.0f * M_PI;
+    while (angle > pi)
+        angle -= 2.0f * pi;
+    while (angle < -pi)
+        angle += 2.0f * pi;
 
     // Update position
     position += velocity * dt;
@@ -365,12 +365,12 @@ void Ship::updateBubbles (float dt)
             bubbleSpawnTimer -= spawnRate;
 
             // Spawn position at rear of ship with some randomness
-            Vec2 backward = Vec2::fromAngle (angle + M_PI);
+            Vec2 backward = Vec2::fromAngle (angle + pi);
             Vec2 spawnPos = position + backward * (length * 0.5f);
 
             // Add some random offset perpendicular to ship direction
             float perpOffset = ((float) rand() / RAND_MAX - 0.5f) * width * 0.8f;
-            Vec2 perp = Vec2::fromAngle (angle + M_PI * 0.5f);
+            Vec2 perp = Vec2::fromAngle (angle + pi * 0.5f);
             spawnPos += perp * perpOffset;
 
             // Random bubble size

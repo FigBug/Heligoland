@@ -277,8 +277,8 @@ void Renderer::drawWindIndicator (Vec2 wind, float screenWidth, float screenHeig
         // Arrow head
         float headSize = 4.0f;
         float headAngle = 0.5f;
-        Vec2 head1 = arrowEnd - windDir * headSize + Vec2::fromAngle (windDir.toAngle() + M_PI * 0.5f) * headSize * 0.5f;
-        Vec2 head2 = arrowEnd - windDir * headSize - Vec2::fromAngle (windDir.toAngle() + M_PI * 0.5f) * headSize * 0.5f;
+        Vec2 head1 = arrowEnd - windDir * headSize + Vec2::fromAngle (windDir.toAngle() + pi * 0.5f) * headSize * 0.5f;
+        Vec2 head2 = arrowEnd - windDir * headSize - Vec2::fromAngle (windDir.toAngle() + pi * 0.5f) * headSize * 0.5f;
         drawLine (arrowEnd, head1, arrowColor);
         drawLine (arrowEnd, head2, arrowColor);
     }
@@ -297,8 +297,8 @@ void Renderer::drawOval (Vec2 center, float width, float height, float angle, SD
     int segments = 32;
     for (int i = 0; i < segments; ++i)
     {
-        float theta1 = (2.0f * M_PI * i) / segments;
-        float theta2 = (2.0f * M_PI * (i + 1)) / segments;
+        float theta1 = (2.0f * pi * i) / segments;
+        float theta2 = (2.0f * pi * (i + 1)) / segments;
 
         // Points on unrotated ellipse
         float x1 = (width / 2.0f) * std::cos (theta1);
@@ -405,7 +405,7 @@ void Renderer::drawShipHull (Vec2 center, float length, float width, float angle
             // Main body - full width with slight curve
             float bodyT = (t + 0.6f) / 1.3f; // Normalized position in body
             // Slight bulge in the middle
-            localHalfWidth = halfWidth * (1.0f + 0.05f * std::sin (bodyT * M_PI));
+            localHalfWidth = halfWidth * (1.0f + 0.05f * std::sin (bodyT * pi));
         }
 
         if (localHalfWidth > 0.5f)
@@ -457,7 +457,7 @@ void Renderer::drawShipHull (Vec2 center, float length, float width, float angle
         else
         {
             float bodyT = (t + 0.6f) / 1.3f;
-            localHalfWidth = halfWidth * (1.0f + 0.05f * std::sin (bodyT * M_PI));
+            localHalfWidth = halfWidth * (1.0f + 0.05f * std::sin (bodyT * pi));
         }
 
         // Top edge (positive Y in local)
@@ -487,7 +487,7 @@ void Renderer::drawShipHull (Vec2 center, float length, float width, float angle
         else
         {
             float bodyT = (t + 0.6f) / 1.3f;
-            localHalfWidth = halfWidth * (1.0f + 0.05f * std::sin (bodyT * M_PI));
+            localHalfWidth = halfWidth * (1.0f + 0.05f * std::sin (bodyT * pi));
         }
 
         // Bottom edge (negative Y in local)
@@ -512,8 +512,8 @@ void Renderer::drawCircle (Vec2 center, float radius, SDL_Color color)
     int segments = 24;
     for (int i = 0; i < segments; ++i)
     {
-        float theta1 = (2.0f * M_PI * i) / segments;
-        float theta2 = (2.0f * M_PI * (i + 1)) / segments;
+        float theta1 = (2.0f * pi * i) / segments;
+        float theta2 = (2.0f * pi * (i + 1)) / segments;
 
         float x1 = center.x + radius * std::cos (theta1);
         float y1 = center.y + radius * std::sin (theta1);

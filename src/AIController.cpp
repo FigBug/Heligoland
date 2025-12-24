@@ -1,5 +1,6 @@
 #include "AIController.h"
 #include "Ship.h"
+#include <algorithm>
 #include <cmath>
 #include <cstdlib>
 
@@ -86,10 +87,10 @@ void AIController::updateWander (float dt, const Ship& myShip, float arenaWidth,
             float angleDiff = avoidAngle - shipAngle;
 
             // Normalize to [-PI, PI]
-            while (angleDiff > M_PI)
-                angleDiff -= 2.0f * M_PI;
-            while (angleDiff < -M_PI)
-                angleDiff += 2.0f * M_PI;
+            while (angleDiff > pi)
+                angleDiff -= 2.0f * pi;
+            while (angleDiff < -pi)
+                angleDiff += 2.0f * pi;
 
             // Strong turn to avoid
             moveInput.x = std::clamp (angleDiff * 3.0f, -1.0f, 1.0f);
@@ -131,16 +132,16 @@ void AIController::updateWander (float dt, const Ship& myShip, float arenaWidth,
         float angleDiff = targetAngle - shipAngle;
 
         // Normalize to [-PI, PI]
-        while (angleDiff > M_PI)
-            angleDiff -= 2.0f * M_PI;
-        while (angleDiff < -M_PI)
-            angleDiff += 2.0f * M_PI;
+        while (angleDiff > pi)
+            angleDiff -= 2.0f * pi;
+        while (angleDiff < -pi)
+            angleDiff += 2.0f * pi;
 
         // Turn toward target
         moveInput.x = std::clamp (angleDiff * 2.0f, -1.0f, 1.0f);
 
         // Move forward if roughly facing target
-        if (std::abs (angleDiff) < M_PI * 0.5f)
+        if (std::abs (angleDiff) < pi * 0.5f)
         {
             moveInput.y = -0.5f; // Negative Y is forward
         }

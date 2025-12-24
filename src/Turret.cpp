@@ -13,8 +13,8 @@ Turret::Turret (Vec2 localOffset_, bool isFrontTurret)
     }
     else
     {
-        angle = M_PI;
-        targetAngle = M_PI;
+        angle = pi;
+        targetAngle = pi;
     }
 }
 
@@ -25,12 +25,12 @@ float Turret::clampAngleToArc (float desiredAngle) const
     // Rear turrets: can aim ±135 degrees from backward (PI)
 
     // Normalize to [-PI, PI]
-    while (desiredAngle > M_PI)
-        desiredAngle -= 2.0f * M_PI;
-    while (desiredAngle < -M_PI)
-        desiredAngle += 2.0f * M_PI;
+    while (desiredAngle > pi)
+        desiredAngle -= 2.0f * pi;
+    while (desiredAngle < -pi)
+        desiredAngle += 2.0f * pi;
 
-    float arcSize = M_PI * 0.75f; // 135 degrees each direction
+    float arcSize = pi * 0.75f; // 135 degrees each direction
 
     if (isFront)
     {
@@ -48,7 +48,7 @@ float Turret::clampAngleToArc (float desiredAngle) const
     {
         // Rear turrets: valid range is around PI (backward)
         // Can aim from 45° to 180° and from -180° to -45°
-        float limit = M_PI - arcSize; // 45 degrees
+        float limit = pi - arcSize; // 45 degrees
 
         // If angle is in the forbidden forward zone
         if (desiredAngle > -limit && desiredAngle < limit)
@@ -77,10 +77,10 @@ void Turret::update (float dt, float shipAngle, Vec2 targetDir)
         float relativeAngle = worldTargetAngle - shipAngle;
 
         // Normalize to [-PI, PI]
-        while (relativeAngle > M_PI)
-            relativeAngle -= 2.0f * M_PI;
-        while (relativeAngle < -M_PI)
-            relativeAngle += 2.0f * M_PI;
+        while (relativeAngle > pi)
+            relativeAngle -= 2.0f * pi;
+        while (relativeAngle < -pi)
+            relativeAngle += 2.0f * pi;
 
         targetAngle = clampAngleToArc (relativeAngle);
     }
@@ -89,26 +89,26 @@ void Turret::update (float dt, float shipAngle, Vec2 targetDir)
     float angleDiff = targetAngle - angle;
 
     // Normalize angle difference to [-PI, PI]
-    while (angleDiff > M_PI)
-        angleDiff -= 2.0f * M_PI;
-    while (angleDiff < -M_PI)
-        angleDiff += 2.0f * M_PI;
+    while (angleDiff > pi)
+        angleDiff -= 2.0f * pi;
+    while (angleDiff < -pi)
+        angleDiff += 2.0f * pi;
 
     float maxRotation = rotationSpeed * dt;
 
     // Check if the short path crosses the forbidden zone
     // If so, force rotation the long way around
-    float arcSize = M_PI * 0.75f; // 135 degrees
+    float arcSize = pi * 0.75f; // 135 degrees
 
     // Test if rotating in the short direction would hit the forbidden zone
     float testStep = maxRotation * (angleDiff > 0 ? 1.0f : -1.0f);
     float testAngle = angle + testStep;
 
     // Normalize test angle
-    while (testAngle > M_PI)
-        testAngle -= 2.0f * M_PI;
-    while (testAngle < -M_PI)
-        testAngle += 2.0f * M_PI;
+    while (testAngle > pi)
+        testAngle -= 2.0f * pi;
+    while (testAngle < -pi)
+        testAngle += 2.0f * pi;
 
     bool wouldHitLimit = false;
 
@@ -120,7 +120,7 @@ void Turret::update (float dt, float shipAngle, Vec2 targetDir)
     else
     {
         // Rear turrets: forbidden zone is near 0 (within ±45°)
-        float limit = M_PI - arcSize; // 45 degrees
+        float limit = pi - arcSize; // 45 degrees
         wouldHitLimit = (std::abs (testAngle) < limit) && (std::abs (angle) >= limit);
     }
 
@@ -129,9 +129,9 @@ void Turret::update (float dt, float shipAngle, Vec2 targetDir)
     {
         angleDiff = -angleDiff;
         // Use the sign of the long way
-        if (std::abs (angleDiff) < M_PI)
+        if (std::abs (angleDiff) < pi)
         {
-            angleDiff = (angleDiff > 0 ? 1.0f : -1.0f) * (2.0f * M_PI - std::abs (angleDiff));
+            angleDiff = (angleDiff > 0 ? 1.0f : -1.0f) * (2.0f * pi - std::abs (angleDiff));
         }
     }
     if (std::abs (angleDiff) < maxRotation)
@@ -148,10 +148,10 @@ void Turret::update (float dt, float shipAngle, Vec2 targetDir)
     }
 
     // Keep angle in [-PI, PI]
-    while (angle > M_PI)
-        angle -= 2.0f * M_PI;
-    while (angle < -M_PI)
-        angle += 2.0f * M_PI;
+    while (angle > pi)
+        angle -= 2.0f * pi;
+    while (angle < -pi)
+        angle += 2.0f * pi;
 }
 
 void Turret::setTargetAngle (float angle_)
@@ -163,10 +163,10 @@ bool Turret::isAimedAtTarget() const
 {
     float angleDiff = targetAngle - angle;
     // Normalize to [-PI, PI]
-    while (angleDiff > M_PI)
-        angleDiff -= 2.0f * M_PI;
-    while (angleDiff < -M_PI)
-        angleDiff += 2.0f * M_PI;
+    while (angleDiff > pi)
+        angleDiff -= 2.0f * pi;
+    while (angleDiff < -pi)
+        angleDiff += 2.0f * pi;
 
     // Consider on target if within ~5 degrees
     return std::abs (angleDiff) < 0.09f;
@@ -180,7 +180,7 @@ bool Turret::isOnTarget() const
 
 bool Turret::isAtArcLimit() const
 {
-    float arcSize = M_PI * 0.75f; // 135 degrees
+    float arcSize = pi * 0.75f; // 135 degrees
     float tolerance = 0.05f;
 
     if (isFront)
@@ -191,7 +191,7 @@ bool Turret::isAtArcLimit() const
     else
     {
         // Rear turrets limited to ±45 degrees from forward (can't go past)
-        float minAngle = M_PI - arcSize; // 45 degrees
+        float minAngle = pi - arcSize; // 45 degrees
         return std::abs (angle - minAngle) < tolerance || std::abs (angle + minAngle) < tolerance;
     }
 }

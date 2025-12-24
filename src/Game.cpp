@@ -174,7 +174,7 @@ void Game::startGame()
     gameStartDelay = 0.5f; // Ignore fire input for first 0.5 seconds
 
     // Initialize wind (minimum 25% strength)
-    float windAngle = ((float) rand() / RAND_MAX) * 2.0f * M_PI;
+    float windAngle = ((float) rand() / RAND_MAX) * 2.0f * pi;
     float windStrength = 0.25f + ((float) rand() / RAND_MAX) * 0.75f;
     wind = Vec2::fromAngle (windAngle) * windStrength;
     targetWind = wind;
@@ -192,7 +192,7 @@ void Game::updateWind (float dt)
         // Pick new target wind - minor adjustment from current wind
         // Small angle change (up to 30 degrees either way)
         float currentAngle = std::atan2 (wind.y, wind.x);
-        float angleChange = ((float) rand() / RAND_MAX - 0.5f) * M_PI / 3.0f; // +/- 30 degrees
+        float angleChange = ((float) rand() / RAND_MAX - 0.5f) * pi / 3.0f; // +/- 30 degrees
         float newAngle = currentAngle + angleChange;
 
         // Small strength change (up to 20% either way), minimum 25%
@@ -775,8 +775,8 @@ Vec2 Game::getShipStartPosition (int index) const
     float radius = std::min (w, h) * 0.35f; // 35% of smaller dimension
 
     // Start at top and go clockwise
-    float angleOffset = -M_PI / 2.0f; // Start at top
-    float angle = angleOffset + (index * 2.0f * M_PI / NUM_SHIPS);
+    float angleOffset = -pi / 2.0f; // Start at top
+    float angle = angleOffset + (index * 2.0f * pi / NUM_SHIPS);
 
     return center + Vec2::fromAngle (angle) * radius;
 }
@@ -784,9 +784,9 @@ Vec2 Game::getShipStartPosition (int index) const
 float Game::getShipStartAngle (int index) const
 {
     // Point ships toward center (opposite of their position angle)
-    float angleOffset = -M_PI / 2.0f; // Start at top
-    float posAngle = angleOffset + (index * 2.0f * M_PI / NUM_SHIPS);
-    return posAngle + M_PI; // Point toward center
+    float angleOffset = -pi / 2.0f; // Start at top
+    float posAngle = angleOffset + (index * 2.0f * pi / NUM_SHIPS);
+    return posAngle + pi; // Point toward center
 }
 
 void Game::getWindowSize (float& width, float& height) const

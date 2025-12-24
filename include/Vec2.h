@@ -1,6 +1,9 @@
 #pragma once
 
 #include <cmath>
+#include <numbers>
+
+inline constexpr double pi = std::numbers::pi;
 
 struct Vec2
 {
