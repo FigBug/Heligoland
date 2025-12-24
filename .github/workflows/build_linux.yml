@@ -19,8 +19,6 @@ jobs:
           sudo apt-get install -y \
             build-essential \
             cmake \
-            ninja-build \
-            libsdl2-dev \
             libgl1-mesa-dev \
             libx11-dev \
             libxext-dev \
@@ -28,21 +26,20 @@ jobs:
             libxcursor-dev \
             libxi-dev \
             libxinerama-dev \
-            libxxf86vm-dev
+            libasound2-dev
 
       - name: Configure
-        run: cmake -B build -G Ninja -DCMAKE_BUILD_TYPE=Release
+        run: cmake -B build -DCMAKE_BUILD_TYPE=Release
 
       - name: Build
         run: cmake --build build --config Release
 
-      - name: Package
+      - name: Create Installer
         run: |
-          cd build
-          zip -r Heligoland_Linux.zip Heligoland
+          cd build && cpack -G DEB
 
       - name: Upload Artifact
         uses: actions/upload-artifact@v4
         with:
           name: Heligoland_Linux
-          path: build/Heligoland_Linux.zip
+          path: build/heligoland_*.deb

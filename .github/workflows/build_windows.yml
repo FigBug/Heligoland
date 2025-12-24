@@ -19,14 +19,14 @@ jobs:
       - name: Build
         run: cmake --build build --config Release
 
-      - name: Package
+      - name: Create Installer
         run: |
-          cd build/Release
-          7z a Heligoland_Windows.zip Heligoland.exe
+          cd build
+          cpack -G NSIS -C Release
         shell: bash
 
       - name: Upload Artifact
         uses: actions/upload-artifact@v4
         with:
           name: Heligoland_Windows
-          path: build/Release/Heligoland_Windows.zip
+          path: build/Heligoland-*.exe

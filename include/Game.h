@@ -1,11 +1,11 @@
 #pragma once
 
 #include "AIController.h"
+#include "Audio.h"
 #include "Player.h"
 #include "Renderer.h"
 #include "Shell.h"
 #include "Ship.h"
-#include <SDL3/SDL.h>
 #include <array>
 #include <memory>
 #include <vector>
@@ -53,9 +53,8 @@ private:
     static constexpr float GAME_OVER_TEXT_DELAY = 5.0f; // Delay before showing winner text
     static constexpr float GAME_OVER_RETURN_DELAY = 8.0f; // Total delay before returning to title
 
-    SDL_Window* window = nullptr;
-    SDL_Renderer* sdlRenderer = nullptr;
     std::unique_ptr<Renderer> renderer;
+    std::unique_ptr<Audio> audio;
 
     bool running = false;
     GameState state = GameState::Title;
@@ -64,7 +63,7 @@ private:
     float gameOverTimer = 0.0f;
     float gameStartDelay = 0.0f; // Delay before accepting fire input after game starts
     float time = 0.0f; // Total elapsed time for animations
-    Uint64 lastFrameTime = 0;
+    double lastFrameTime = 0.0;
 
     std::array<std::unique_ptr<Ship>, NUM_SHIPS> ships;
     std::array<std::unique_ptr<Player>, NUM_SHIPS> players;
@@ -109,7 +108,5 @@ private:
     int getTeam (int playerIndex) const;  // Returns 0 or 1 for team mode
     bool areEnemies (int playerA, int playerB) const;
     void getWindowSize (float& width, float& height) const;
-    void setupLogicalPresentation();
-    void handleWindowResize();
     void cycleGameMode (int direction);
 };

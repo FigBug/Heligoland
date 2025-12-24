@@ -8,34 +8,17 @@ set(CMAKE_OSX_ARCHITECTURES "arm64;x86_64" CACHE STRING "Build universal binary"
 file(READ "${CMAKE_CURRENT_SOURCE_DIR}/VERSION" VERSION_STRING)
 string(STRIP "${VERSION_STRING}" VERSION_STRING)
 
-project(Heligoland VERSION ${VERSION_STRING} LANGUAGES CXX)
+project(Heligoland VERSION ${VERSION_STRING} LANGUAGES CXX C)
 
 set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
-# SDL3 options
-set(SDL_SHARED OFF CACHE BOOL "" FORCE)
-set(SDL_STATIC ON CACHE BOOL "" FORCE)
-set(SDL_TEST OFF CACHE BOOL "" FORCE)
-set(SDL_TESTS OFF CACHE BOOL "" FORCE)
-set(SDL_EXAMPLES OFF CACHE BOOL "" FORCE)
-set(SDL_INSTALL OFF CACHE BOOL "" FORCE)
-set(SDL_DISABLE_INSTALL OFF CACHE BOOL "" FORCE)
+# raylib options
+set(BUILD_EXAMPLES OFF CACHE BOOL "" FORCE)
+set(BUILD_GAMES OFF CACHE BOOL "" FORCE)
+set(BUILD_SHARED_LIBS OFF CACHE BOOL "" FORCE)
 
-# Disable features we don't need
-set(SDL_X11_XTEST OFF CACHE BOOL "" FORCE)
-set(SDL_X11_XSCRNSAVER OFF CACHE BOOL "" FORCE)
-set(SDL_CAMERA OFF CACHE BOOL "" FORCE)
-set(SDL_SENSOR OFF CACHE BOOL "" FORCE)
-set(SDL_POWER OFF CACHE BOOL "" FORCE)
-set(SDL_DIALOG OFF CACHE BOOL "" FORCE)
-set(SDL_GPU OFF CACHE BOOL "" FORCE)
-set(SDL_RENDER_GPU OFF CACHE BOOL "" FORCE)
-set(SDL_VULKAN OFF CACHE BOOL "" FORCE)
-set(SDL_RENDER_VULKAN OFF CACHE BOOL "" FORCE)
-set(SDL_OPENGLES OFF CACHE BOOL "" FORCE)
-
-add_subdirectory(modules/SDL)
+add_subdirectory(modules/raylib)
 
 set(SOURCES
     src/main.cpp
@@ -46,6 +29,7 @@ set(SOURCES
     src/Player.cpp
     src/AIController.cpp
     src/Renderer.cpp
+    src/Audio.cpp
 )
 
 set(HEADERS
@@ -56,6 +40,7 @@ set(HEADERS
     include/Player.h
     include/AIController.h
     include/Renderer.h
+    include/Audio.h
     include/Vec2.h
 )
 
@@ -81,11 +66,10 @@ target_include_directories(${PROJECT_NAME} PRIVATE
     ${CMAKE_CURRENT_SOURCE_DIR}/include
 )
 
-target_link_libraries(${PROJECT_NAME} PRIVATE SDL3::SDL3-static)
+target_link_libraries(${PROJECT_NAME} PRIVATE raylib)
 
 # Platform-specific settings
 if(WIN32)
-    target_link_libraries(${PROJECT_NAME} PRIVATE winmm imm32 version setupapi)
     set_target_properties(${PROJECT_NAME} PROPERTIES WIN32_EXECUTABLE TRUE)
 elseif(APPLE)
     set_target_properties(${PROJECT_NAME} PROPERTIES
@@ -94,22 +78,83 @@ elseif(APPLE)
         MACOSX_BUNDLE_BUNDLE_VERSION "${PROJECT_VERSION}"
         MACOSX_BUNDLE_SHORT_VERSION_STRING "${PROJECT_VERSION}"
     )
-    target_link_libraries(${PROJECT_NAME} PRIVATE
-        "-framework Cocoa"
-        "-framework IOKit"
-        "-framework CoreAudio"
-        "-framework CoreVideo"
-        "-framework AudioToolbox"
-        "-framework Carbon"
-        "-framework ForceFeedback"
-        "-framework GameController"
-        "-framework CoreHaptics"
-    )
-elseif(UNIX)
-    find_package(PkgConfig REQUIRED)
 endif()
 
 # Copy assets to build directory (if they exist)
 if(EXISTS ${CMAKE_CURRENT_SOURCE_DIR}/assets)
-    file(COPY ${CMAKE_CURRENT_SOURCE_DIR}/assets DESTINATION ${CMAKE_CURRENT_BINARY_DIR})
+    if(APPLE)
+        # For macOS, copy assets into the app bundle Resources folder
+        file(GLOB ASSET_FILES "${CMAKE_CURRENT_SOURCE_DIR}/assets/*")
+        foreach(ASSET_FILE ${ASSET_FILES})
+            get_filename_component(ASSET_NAME ${ASSET_FILE} NAME)
+            set_source_files_properties(${ASSET_FILE} PROPERTIES MACOSX_PACKAGE_LOCATION "Resources/assets")
+            target_sources(${PROJECT_NAME} PRIVATE ${ASSET_FILE})
+        endforeach()
+    else()
+        file(COPY ${CMAKE_CURRENT_SOURCE_DIR}/assets DESTINATION ${CMAKE_CURRENT_BINARY_DIR})
+    endif()
 endif()
+
+# =============================================================================
+# CPack installer configuration
+# =============================================================================
+set(CPACK_PACKAGE_NAME "Heligoland")
+set(CPACK_PACKAGE_VENDOR "Heligoland")
+set(CPACK_PACKAGE_DESCRIPTION_SUMMARY "A naval combat game")
+set(CPACK_PACKAGE_VERSION ${PROJECT_VERSION})
+set(CPACK_PACKAGE_VERSION_MAJOR ${PROJECT_VERSION_MAJOR})
+set(CPACK_PACKAGE_VERSION_MINOR ${PROJECT_VERSION_MINOR})
+set(CPACK_PACKAGE_VERSION_PATCH ${PROJECT_VERSION_PATCH})
+set(CPACK_PACKAGE_INSTALL_DIRECTORY "Heligoland")
+set(CPACK_RESOURCE_FILE_LICENSE "${CMAKE_CURRENT_SOURCE_DIR}/LICENSE.txt")
+
+if(APPLE)
+    # macOS: Create .pkg installer
+    set(CPACK_GENERATOR "productbuild")
+    set(CPACK_PRODUCTBUILD_IDENTIFIER "com.heligoland.game")
+    set(CPACK_PRODUCTBUILD_IDENTITY_NAME "INSTALLER")
+
+    # Install the app bundle to /Applications
+    install(TARGETS ${PROJECT_NAME} BUNDLE DESTINATION "." COMPONENT Runtime)
+
+    set(CPACK_PACKAGING_INSTALL_PREFIX "/Applications")
+
+elseif(WIN32)
+    # Windows: Create NSIS installer (.exe)
+    set(CPACK_GENERATOR "NSIS")
+    set(CPACK_NSIS_DISPLAY_NAME "Heligoland")
+    set(CPACK_NSIS_PACKAGE_NAME "Heligoland")
+    set(CPACK_NSIS_INSTALL_ROOT "$PROGRAMFILES64")
+    set(CPACK_NSIS_ENABLE_UNINSTALL_BEFORE_INSTALL ON)
+    set(CPACK_NSIS_CREATE_ICONS_EXTRA
+        "CreateShortCut '$SMPROGRAMS\\\\$STARTMENU_FOLDER\\\\Heligoland.lnk' '$INSTDIR\\\\bin\\\\Heligoland.exe'")
+    set(CPACK_NSIS_DELETE_ICONS_EXTRA
+        "Delete '$SMPROGRAMS\\\\$START_MENU\\\\Heligoland.lnk'")
+
+    # Install executable and assets
+    install(TARGETS ${PROJECT_NAME} RUNTIME DESTINATION bin COMPONENT Runtime)
+    install(DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/assets DESTINATION bin COMPONENT Runtime)
+
+else()
+    # Linux: Create .deb package
+    set(CPACK_GENERATOR "DEB")
+    set(CPACK_DEBIAN_PACKAGE_MAINTAINER "Heligoland")
+    set(CPACK_DEBIAN_PACKAGE_SECTION "games")
+    set(CPACK_DEBIAN_PACKAGE_DEPENDS "libc6, libgl1, libasound2")
+    set(CPACK_DEBIAN_FILE_NAME DEB-DEFAULT)
+
+    # Install to standard Linux locations
+    install(TARGETS ${PROJECT_NAME} RUNTIME DESTINATION bin COMPONENT Runtime)
+    install(DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/assets DESTINATION share/heligoland COMPONENT Runtime)
+
+    # Install desktop file for Linux
+    configure_file(
+        "${CMAKE_CURRENT_SOURCE_DIR}/heligoland.desktop.in"
+        "${CMAKE_CURRENT_BINARY_DIR}/heligoland.desktop"
+        @ONLY
+    )
+    install(FILES "${CMAKE_CURRENT_BINARY_DIR}/heligoland.desktop"
+            DESTINATION share/applications COMPONENT Runtime)
+endif()
+
+include(CPack)

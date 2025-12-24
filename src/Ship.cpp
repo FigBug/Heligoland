@@ -1,5 +1,4 @@
 #include "Ship.h"
-#include <SDL3/SDL.h>
 #include <algorithm>
 #include <cmath>
 
@@ -17,6 +16,20 @@ Ship::Ship (int playerIndex_, Vec2 startPos, float startAngle, bool teamMode_)
 
 void Ship::update (float dt, Vec2 moveInput, Vec2 aimInput, bool fireInput, float arenaWidth, float arenaHeight, Vec2 wind)
 {
+    // Handle sinking
+    if (sinking)
+    {
+        sinkTimer += dt;
+
+        // Slow down while sinking
+        velocity *= 0.98f;
+        angularVelocity *= 0.95f;
+
+        // Still update smoke (more smoke while sinking)
+        updateSmoke (dt, wind);
+        return; // Don't process any other input while sinking
+    }
+
     // Calculate damage penalty (up to 20% reduction in speed and turning)
     float damagePercent = getDamagePercent();
     float damagePenalty = 1.0f - (damagePercent * 0.2f);
@@ -210,7 +223,7 @@ void Ship::clampToArena (float arenaWidth, float arenaHeight)
     }
 }
 
-SDL_Color Ship::getColor() const
+Color Ship::getColor() const
 {
     if (teamMode)
     {
@@ -251,10 +264,15 @@ SDL_Color Ship::getColor() const
 
 void Ship::takeDamage (float damage)
 {
+    if (sinking)
+        return; // Can't take more damage while sinking
+
     health -= damage;
-    if (health < 0)
+    if (health <= 0)
     {
         health = 0;
+        sinking = true;
+        sinkTimer = 0.0f;
     }
 }
 

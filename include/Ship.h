@@ -3,10 +3,9 @@
 #include "Shell.h"
 #include "Turret.h"
 #include "Vec2.h"
+#include <raylib.h>
 #include <array>
 #include <vector>
-
-struct SDL_Color;
 
 struct Bubble
 {
@@ -42,12 +41,15 @@ public:
     const std::vector<Smoke>& getSmoke() const { return smoke; }
     float getDamagePercent() const { return 1.0f - (health / maxHealth); }
     std::vector<Shell>& getPendingShells() { return pendingShells; }
-    SDL_Color getColor() const;
+    Color getColor() const;
 
     // Health system
     float getHealth() const { return health; }
     float getMaxHealth() const { return maxHealth; }
-    bool isAlive() const { return health > 0; }
+    bool isAlive() const { return health > 0 || isSinking(); }
+    bool isSinking() const { return sinking; }
+    bool isFullySunk() const { return sinking && sinkTimer >= sinkDuration; }
+    float getSinkProgress() const { return sinking ? sinkTimer / sinkDuration : 0.0f; }
     void takeDamage (float damage);
 
     // Collision
@@ -100,6 +102,11 @@ private:
     // Health
     float health = 1000.0f;
     float maxHealth = 1000.0f;
+
+    // Sinking
+    bool sinking = false;
+    float sinkTimer = 0.0f;
+    static constexpr float sinkDuration = 30.0f;
 
     // Shooting
     std::vector<Shell> pendingShells; // Shells to be added to game

@@ -1,0 +1,51 @@
+#pragma once
+
+#include <raylib.h>
+#include <string>
+#include <random>
+
+class Audio
+{
+public:
+    Audio();
+    ~Audio();
+
+    bool init();
+    void shutdown();
+    void update (float dt);
+
+    // Play sounds with position-based panning (screenX from 0 to screenWidth)
+    void playCannon (float screenX, float screenWidth);
+    void playSplash (float screenX, float screenWidth);
+    void playExplosion (float screenX, float screenWidth);
+    void playCollision (float screenX, float screenWidth);
+
+    // Engine is played continuously with volume based on average throttle
+    void setEngineVolume (float volume); // 0.0 to 1.0
+
+private:
+    void playWithVariation (Sound& sound, float screenX, float screenWidth);
+    float randomPitchVariation();
+    float randomGainVariation();
+    float panFromScreenX (float screenX, float screenWidth);
+
+    Sound cannonSound = { 0 };
+    Sound splashSound = { 0 };
+    Sound explosionSound = { 0 };
+    Sound collisionSound = { 0 };
+    Music engineSound = { 0 };
+
+    bool initialized = false;
+
+    // Gun silencing - only one gun sound at a time
+    float gunSilenceTimer = 0.0f;
+    static constexpr float gunSilenceDuration = 0.25f; // 250ms
+
+    // Random number generator for variations
+    std::mt19937 rng;
+    std::uniform_real_distribution<float> pitchDist { 0.9f, 1.1f };  // +/- 10%
+    std::uniform_real_distribution<float> gainDist { 0.9f, 1.1f };   // +/- 10%
+
+    float engineVolume = 0.0f;
+    float currentEngineVolume = 0.0f;
+};

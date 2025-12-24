@@ -1,7 +1,7 @@
 #pragma once
 
 #include "Vec2.h"
-#include <SDL3/SDL.h>
+#include <raylib.h>
 #include <string>
 
 class Ship;
@@ -11,7 +11,7 @@ struct Explosion;
 class Renderer
 {
 public:
-    Renderer (SDL_Renderer* renderer);
+    Renderer();
     ~Renderer();
 
     void clear();
@@ -27,24 +27,24 @@ public:
     void drawShipHUD (const Ship& ship, int slot, int totalSlots, float screenWidth, float alpha = 1.0f);
     void drawWindIndicator (Vec2 wind, float screenWidth, float screenHeight);
 
-    void drawOval (Vec2 center, float width, float height, float angle, SDL_Color color);
-    void drawCircle (Vec2 center, float radius, SDL_Color color);
-    void drawLine (Vec2 start, Vec2 end, SDL_Color color);
-    void drawRect (Vec2 topLeft, float width, float height, SDL_Color color);
-    void drawFilledRect (Vec2 topLeft, float width, float height, SDL_Color color);
+    void drawOval (Vec2 center, float width, float height, float angle, Color color);
+    void drawCircle (Vec2 center, float radius, Color color);
+    void drawLine (Vec2 start, Vec2 end, Color color);
+    void drawRect (Vec2 topLeft, float width, float height, Color color);
+    void drawFilledRect (Vec2 topLeft, float width, float height, Color color);
 
     // Simple bitmap text rendering (blocky letters)
-    void drawText (const std::string& text, Vec2 position, float scale, SDL_Color color);
-    void drawTextCentered (const std::string& text, Vec2 center, float scale, SDL_Color color);
+    void drawText (const std::string& text, Vec2 position, float scale, Color color);
+    void drawTextCentered (const std::string& text, Vec2 center, float scale, Color color);
 
 private:
-    SDL_Renderer* renderer;
-    SDL_Texture* noiseTexture = nullptr;
-    int noiseTextureSize = 128;
-
     void createNoiseTexture();
-    void drawFilledOval (Vec2 center, float width, float height, float angle, SDL_Color color);
-    void drawFilledCircle (Vec2 center, float radius, SDL_Color color);
-    void drawShipHull (Vec2 center, float length, float width, float angle, SDL_Color color);
-    void drawChar (char c, Vec2 position, float scale, SDL_Color color);
+    void drawFilledOval (Vec2 center, float width, float height, float angle, Color color);
+    void drawFilledCircle (Vec2 center, float radius, Color color);
+    void drawShipHull (Vec2 center, float length, float width, float angle, Color color);
+    void drawChar (char c, Vec2 position, float scale, Color color);
+
+    Texture2D noiseTexture1 = { 0 };
+    Texture2D noiseTexture2 = { 0 };
+    static constexpr int noiseTextureSize = 128;
 };

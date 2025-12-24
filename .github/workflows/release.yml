@@ -6,53 +6,88 @@ on:
       - 'v*'
 
 jobs:
-  build:
-    strategy:
-      matrix:
-        include:
-          - os: macos-latest
-            name: macOS
-            artifact: Heligoland-macOS.zip
-            build_cmd: |
-              cmake -B build -DCMAKE_BUILD_TYPE=Release
-              cmake --build build --config Release
-              cd build && zip -r Heligoland-macOS.zip Heligoland.app
-          - os: windows-latest
-            name: Windows
-            artifact: Heligoland-Windows.zip
-            build_cmd: |
-              cmake -B build -G "Visual Studio 17 2022" -A x64
-              cmake --build build --config Release
-              cd build/Release && 7z a ../Heligoland-Windows.zip Heligoland.exe
-          - os: ubuntu-latest
-            name: Linux
-            artifact: Heligoland-Linux.zip
-            build_cmd: |
-              sudo apt-get update
-              sudo apt-get install -y libgl1-mesa-dev libx11-dev libxext-dev libxrandr-dev libxcursor-dev libxi-dev libxinerama-dev
-              cmake -B build -DCMAKE_BUILD_TYPE=Release
-              cmake --build build
-              cd build && zip Heligoland-Linux.zip Heligoland
-
-    runs-on: ${{ matrix.os }}
-    name: Build ${{ matrix.name }}
+  build-macos:
+    runs-on: macos-latest
+    name: Build macOS
     steps:
       - uses: actions/checkout@v4
         with:
           submodules: recursive
 
-      - name: Build
-        shell: bash
-        run: ${{ matrix.build_cmd }}
+      - name: Setup Keychain
+        env:
+          INSTALLER: ${{ secrets.INSTALLER }}
+          CERT_PASS: ${{ secrets.CERT_PASS }}
+        run: |
+          security create-keychain -p "" build.keychain
+          security default-keychain -s build.keychain
+          security unlock-keychain -p "" build.keychain
+          security set-keychain-settings -t 3600 -u build.keychain
+          echo "$INSTALLER" | base64 -D -o /tmp/Installer.p12
+          security import /tmp/Installer.p12 -t agg -k build.keychain -P "$CERT_PASS" -A -T /usr/bin/productbuild
+          security set-key-partition-list -S apple-tool:,apple: -s -k "" build.keychain
+          rm /tmp/Installer.p12
+
+      - name: Build and Package
+        run: |
+          cmake -B build -DCMAKE_BUILD_TYPE=Release
+          cmake --build build --config Release
+          cd build && cpack -G productbuild
 
       - name: Upload artifact
         uses: actions/upload-artifact@v4
         with:
-          name: ${{ matrix.name }}
-          path: build/${{ matrix.artifact }}
+          name: macOS
+          path: build/Heligoland-*.pkg
+
+  build-windows:
+    runs-on: windows-latest
+    name: Build Windows
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - name: Build and Package
+        shell: bash
+        run: |
+          cmake -B build -G "Visual Studio 17 2022" -A x64
+          cmake --build build --config Release
+          cd build && cpack -G NSIS -C Release
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: Windows
+          path: build/Heligoland-*.exe
+
+  build-linux:
+    runs-on: ubuntu-latest
+    name: Build Linux
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - name: Install dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libgl1-mesa-dev libx11-dev libxext-dev libxrandr-dev libxcursor-dev libxi-dev libxinerama-dev libasound2-dev
+
+      - name: Build and Package
+        run: |
+          cmake -B build -DCMAKE_BUILD_TYPE=Release
+          cmake --build build
+          cd build && cpack -G DEB
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: Linux
+          path: build/heligoland_*.deb
 
   release:
-    needs: build
+    needs: [build-macos, build-windows, build-linux]
     runs-on: ubuntu-latest
     permissions:
       contents: write
@@ -62,11 +97,14 @@ jobs:
         with:
           path: artifacts
 
+      - name: List artifacts
+        run: find artifacts -type f
+
       - name: Create Release
         uses: softprops/action-gh-release@v1
         with:
           files: |
-            artifacts/macOS/Heligoland-macOS.zip
-            artifacts/Windows/Heligoland-Windows.zip
-            artifacts/Linux/Heligoland-Linux.zip
+            artifacts/macOS/*
+            artifacts/Windows/*
+            artifacts/Linux/*
           generate_release_notes: true

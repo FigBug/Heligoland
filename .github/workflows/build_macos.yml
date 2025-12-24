@@ -25,9 +25,14 @@ jobs:
 
           echo "$APPLICATION" | base64 -D -o /tmp/Application.p12
           security import /tmp/Application.p12 -t agg -k build.keychain -P "$CERT_PASS" -A -T /usr/bin/codesign
+
+          echo "$INSTALLER" | base64 -D -o /tmp/Installer.p12
+          security import /tmp/Installer.p12 -t agg -k build.keychain -P "$CERT_PASS" -A -T /usr/bin/productbuild
+
           security set-key-partition-list -S apple-tool:,apple: -s -k "$KEYCHAIN_PASS" build.keychain
         env:
           APPLICATION: ${{ secrets.APPLICATION }}
+          INSTALLER: ${{ secrets.INSTALLER }}
           CERT_PASS: ${{ secrets.CERT_PASS }}
           KEYCHAIN_PASS: ${{ secrets.KEYCHAIN_PASS }}
 
@@ -43,40 +48,36 @@ jobs:
           codesign --deep --force --verify --verbose --timestamp \
             --options runtime \
             --sign "$DEV_ID" \
-            build/Heligoland.app
+            build/Release/Heligoland.app
         env:
           DEV_ID: ${{ secrets.DEV_ID }}
 
       - name: Notarize Application
         if: env.HAS_SIGNING == 'true'
         run: |
-          cd build
-          zip -r Heligoland_macOS.zip Heligoland.app
+          cd build/Release
+          zip -r Heligoland.zip Heligoland.app
 
           xcrun notarytool submit \
             --apple-id "$APPLE_USER" \
             --password "$APPLE_PASS" \
             --team-id "$TEAM_ID" \
             --wait --timeout 30m \
-            Heligoland_macOS.zip
+            Heligoland.zip
 
           xcrun stapler staple Heligoland.app
-
-          rm Heligoland_macOS.zip
-          zip -r Heligoland_macOS.zip Heligoland.app
+          rm Heligoland.zip
         env:
           APPLE_USER: ${{ secrets.APPLE_USER }}
           APPLE_PASS: ${{ secrets.APPLE_PASS }}
           TEAM_ID: ${{ secrets.TEAM_ID }}
 
-      - name: Create ZIP
-        if: env.HAS_SIGNING != 'true'
+      - name: Create Installer
         run: |
-          cd build
-          zip -r Heligoland_macOS.zip Heligoland.app
+          cd build && cpack -G productbuild
 
       - name: Upload Artifact
         uses: actions/upload-artifact@v4
         with:
           name: Heligoland_macOS
-          path: build/Heligoland_macOS.zip
+          path: build/Heligoland-*.pkg

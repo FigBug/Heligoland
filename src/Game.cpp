@@ -1,4 +1,5 @@
 #include "Game.h"
+#include <raylib.h>
 #include <algorithm>
 #include <cmath>
 
@@ -8,30 +9,18 @@ Game::~Game() = default;
 
 bool Game::init()
 {
-    if (! SDL_Init (SDL_INIT_VIDEO | SDL_INIT_GAMEPAD))
+    SetConfigFlags (FLAG_WINDOW_RESIZABLE | FLAG_MSAA_4X_HINT);
+    InitWindow (WINDOW_WIDTH, WINDOW_HEIGHT, "Heligoland");
+    SetTargetFPS (60);
+
+    renderer = std::make_unique<Renderer>();
+    audio = std::make_unique<Audio>();
+
+    if (! audio->init())
     {
-        SDL_Log ("Failed to initialize SDL: %s", SDL_GetError());
-        return false;
+        // Audio is optional - continue without it
+        audio.reset();
     }
-
-    window = SDL_CreateWindow ("Heligoland", WINDOW_WIDTH, WINDOW_HEIGHT, SDL_WINDOW_RESIZABLE | SDL_WINDOW_HIGH_PIXEL_DENSITY);
-    if (! window)
-    {
-        SDL_Log ("Failed to create window: %s", SDL_GetError());
-        return false;
-    }
-
-    sdlRenderer = SDL_CreateRenderer (window, nullptr);
-    if (! sdlRenderer)
-    {
-        SDL_Log ("Failed to create renderer: %s", SDL_GetError());
-        return false;
-    }
-
-    // Set up logical presentation for high DPI displays
-    setupLogicalPresentation();
-
-    renderer = std::make_unique<Renderer> (sdlRenderer);
 
     // Create players (but not ships yet - those are created when game starts)
     for (int i = 0; i < NUM_SHIPS; ++i)
@@ -42,17 +31,17 @@ bool Game::init()
 
     state = GameState::Title;
     running = true;
-    lastFrameTime = SDL_GetTicks();
+    lastFrameTime = GetTime();
 
     return true;
 }
 
 void Game::run()
 {
-    while (running)
+    while (running && !WindowShouldClose())
     {
-        Uint64 currentTime = SDL_GetTicks();
-        float dt = (currentTime - lastFrameTime) / 1000.0f;
+        double currentTime = GetTime();
+        float dt = (float) (currentTime - lastFrameTime);
         lastFrameTime = currentTime;
 
         // Cap delta time to avoid spiral of death
@@ -71,48 +60,18 @@ void Game::shutdown()
     players = {};
     aiControllers = {};
     renderer.reset();
+    if (audio)
+        audio->shutdown();
+    audio.reset();
 
-    if (sdlRenderer)
-    {
-        SDL_DestroyRenderer (sdlRenderer);
-        sdlRenderer = nullptr;
-    }
-
-    if (window)
-    {
-        SDL_DestroyWindow (window);
-        window = nullptr;
-    }
-
-    SDL_Quit();
+    CloseWindow();
 }
 
 void Game::handleEvents()
 {
-    SDL_Event event;
-    while (SDL_PollEvent (&event))
+    if (IsKeyPressed (KEY_ESCAPE))
     {
-        if (event.type == SDL_EVENT_QUIT)
-        {
-            running = false;
-        }
-        else if (event.type == SDL_EVENT_KEY_DOWN)
-        {
-            if (event.key.key == SDLK_ESCAPE)
-            {
-                running = false;
-            }
-        }
-        else if (event.type == SDL_EVENT_WINDOW_RESIZED)
-        {
-            handleWindowResize();
-        }
-
-        // Pass events to players for gamepad handling
-        for (auto& player : players)
-        {
-            player->handleEvent (event);
-        }
+        running = false;
     }
 }
 
@@ -120,6 +79,12 @@ void Game::update (float dt)
 {
     // Update total time for animations
     time += dt;
+
+    // Update audio
+    if (audio)
+    {
+        audio->update (dt);
+    }
 
     // Update players for gamepad detection
     for (auto& player : players)
@@ -150,26 +115,15 @@ void Game::updateTitle (float dt)
     bool leftBumperPressed = false;
     bool rightBumperPressed = false;
 
-    for (auto& player : players)
+    // Check all gamepads for bumper presses
+    for (int i = 0; i < 4; ++i)
     {
-        if (player->isConnected())
+        if (IsGamepadAvailable (i))
         {
-            // Get gamepad for this player (we need to check bumpers directly)
-            int numGamepads = 0;
-            SDL_JoystickID* gamepads = SDL_GetGamepads (&numGamepads);
-            if (gamepads && player->getPlayerIndex() < numGamepads)
-            {
-                SDL_Gamepad* gp = SDL_OpenGamepad (gamepads[player->getPlayerIndex()]);
-                if (gp)
-                {
-                    if (SDL_GetGamepadButton (gp, SDL_GAMEPAD_BUTTON_LEFT_SHOULDER))
-                        leftBumperPressed = true;
-                    if (SDL_GetGamepadButton (gp, SDL_GAMEPAD_BUTTON_RIGHT_SHOULDER))
-                        rightBumperPressed = true;
-                    SDL_CloseGamepad (gp);
-                }
-            }
-            SDL_free (gamepads);
+            if (IsGamepadButtonDown (i, GAMEPAD_BUTTON_LEFT_TRIGGER_1))
+                leftBumperPressed = true;
+            if (IsGamepadButtonDown (i, GAMEPAD_BUTTON_RIGHT_TRIGGER_1))
+                rightBumperPressed = true;
         }
     }
 
@@ -192,26 +146,20 @@ void Game::updateTitle (float dt)
 bool Game::anyButtonPressed()
 {
     // Check for face buttons only (not bumpers, which are used for mode switching)
-    int numGamepads = 0;
-    SDL_JoystickID* gamepads = SDL_GetGamepads (&numGamepads);
-    if (! gamepads)
-        return false;
-
-    bool pressed = false;
-    for (int i = 0; i < numGamepads && ! pressed; ++i)
+    for (int i = 0; i < 4; ++i)
     {
-        SDL_Gamepad* gp = SDL_OpenGamepad (gamepads[i]);
-        if (gp)
+        if (IsGamepadAvailable (i))
         {
-            pressed = SDL_GetGamepadButton (gp, SDL_GAMEPAD_BUTTON_SOUTH) ||
-                      SDL_GetGamepadButton (gp, SDL_GAMEPAD_BUTTON_EAST) ||
-                      SDL_GetGamepadButton (gp, SDL_GAMEPAD_BUTTON_WEST) ||
-                      SDL_GetGamepadButton (gp, SDL_GAMEPAD_BUTTON_NORTH);
-            SDL_CloseGamepad (gp);
+            if (IsGamepadButtonPressed (i, GAMEPAD_BUTTON_RIGHT_FACE_DOWN) ||  // A / Cross
+                IsGamepadButtonPressed (i, GAMEPAD_BUTTON_RIGHT_FACE_RIGHT) || // B / Circle
+                IsGamepadButtonPressed (i, GAMEPAD_BUTTON_RIGHT_FACE_LEFT) ||  // X / Square
+                IsGamepadButtonPressed (i, GAMEPAD_BUTTON_RIGHT_FACE_UP))      // Y / Triangle
+            {
+                return true;
+            }
         }
     }
-    SDL_free (gamepads);
-    return pressed;
+    return false;
 }
 
 void Game::startGame()
@@ -304,8 +252,8 @@ void Game::updatePlaying (float dt)
             float nearestDist = 999999.0f;
             for (int j = 0; j < NUM_SHIPS; ++j)
             {
-                // Only target enemies (in team mode, skip teammates)
-                if (areEnemies (i, j) && ships[j] && ships[j]->isAlive())
+                // Only target enemies that are alive and not sinking
+                if (areEnemies (i, j) && ships[j] && ships[j]->isAlive() && ! ships[j]->isSinking())
                 {
                     float dist = (ships[j]->getPosition() - ships[i]->getPosition()).length();
                     if (dist < nearestDist)
@@ -326,11 +274,33 @@ void Game::updatePlaying (float dt)
 
         // Collect pending shells from ship
         auto& pendingShells = ships[i]->getPendingShells();
+        if (! pendingShells.empty() && audio)
+        {
+            // Play cannon sound at ship position
+            audio->playCannon (ships[i]->getPosition().x, arenaWidth);
+        }
         for (auto& shell : pendingShells)
         {
             shells.push_back (std::move (shell));
         }
         pendingShells.clear();
+    }
+
+    // Update engine volume based on average throttle of alive ships
+    if (audio)
+    {
+        float totalThrottle = 0.0f;
+        int aliveCount = 0;
+        for (int i = 0; i < NUM_SHIPS; ++i)
+        {
+            if (ships[i] && ships[i]->isAlive())
+            {
+                totalThrottle += std::abs (ships[i]->getThrottle());
+                aliveCount++;
+            }
+        }
+        float avgThrottle = aliveCount > 0 ? totalThrottle / aliveCount : 0.0f;
+        audio->setEngineVolume (0.3f + avgThrottle * 0.7f); // Base volume + throttle boost
     }
 
     // Update shells
@@ -454,6 +424,9 @@ void Game::checkCollisions()
 
             if (dist < hitRadius + shell.getSplashRadius())
             {
+                float arenaWidth, arenaHeight;
+                getWindowSize (arenaWidth, arenaHeight);
+
                 ship->takeDamage (SHELL_DAMAGE);
 
                 // Spawn hit explosion
@@ -461,6 +434,12 @@ void Game::checkCollisions()
                 explosion.position = shell.getPosition();
                 explosion.isHit = true;
                 explosions.push_back (explosion);
+
+                // Play explosion sound
+                if (audio)
+                {
+                    audio->playExplosion (shell.getPosition().x, arenaWidth);
+                }
 
                 // Check if ship was sunk
                 if (! ship->isAlive())
@@ -482,11 +461,20 @@ void Game::checkCollisions()
         // Kill landed shells after checking for hits (they splash and disappear)
         if (shell.hasLanded() && shell.isAlive())
         {
+            float arenaWidth, arenaHeight;
+            getWindowSize (arenaWidth, arenaHeight);
+
             // Spawn splash (miss) - hits are handled above
             Explosion splash;
             splash.position = shell.getPosition();
             splash.isHit = false;
             explosions.push_back (splash);
+
+            // Play splash sound
+            if (audio)
+            {
+                audio->playSplash (shell.getPosition().x, arenaWidth);
+            }
 
             shell.kill();
         }
@@ -573,6 +561,15 @@ void Game::checkCollisions()
                 ships[i]->takeDamage (damage);
                 ships[j]->takeDamage (damage);
 
+                // Play collision sound at midpoint between ships
+                if (audio && impactSpeed > 10.0f) // Only play for significant impacts
+                {
+                    float arenaWidth, arenaHeight;
+                    getWindowSize (arenaWidth, arenaHeight);
+                    Vec2 midpoint = (ships[i]->getPosition() + ships[j]->getPosition()) * 0.5f;
+                    audio->playCollision (midpoint.x, arenaWidth);
+                }
+
                 // Determine collision normal (from i to j)
                 Vec2 diff = ships[j]->getPosition() - ships[i]->getPosition();
                 if (diff.dot (minAxis) < 0)
@@ -592,15 +589,21 @@ void Game::checkCollisions()
 
 void Game::checkGameOver()
 {
+    // Helper to check if a ship can still fight (alive and not sinking)
+    auto canFight = [this] (int i) -> bool
+    {
+        return ships[i] && ships[i]->isAlive() && ! ships[i]->isSinking();
+    };
+
     if (gameMode == GameMode::Teams)
     {
-        // Count alive ships per team
+        // Count fighting ships per team
         int team0Alive = 0;
         int team1Alive = 0;
 
         for (int i = 0; i < NUM_SHIPS; ++i)
         {
-            if (ships[i] && ships[i]->isAlive())
+            if (canFight (i))
             {
                 if (getTeam (i) == 0)
                     team0Alive++;
@@ -631,7 +634,7 @@ void Game::checkGameOver()
 
         for (int i = 0; i < NUM_SHIPS; ++i)
         {
-            if (ships[i] && ships[i]->isAlive())
+            if (canFight (i))
             {
                 aliveCount++;
                 lastAlive = i;
@@ -649,6 +652,8 @@ void Game::checkGameOver()
 
 void Game::render()
 {
+    BeginDrawing();
+
     float w, h;
     getWindowSize (w, h);
     renderer->drawWater (time, w, h);
@@ -668,6 +673,8 @@ void Game::render()
     }
 
     renderer->present();
+
+    EndDrawing();
 }
 
 void Game::renderTitle()
@@ -676,11 +683,11 @@ void Game::renderTitle()
     getWindowSize (w, h);
 
     // Draw title
-    SDL_Color titleColor = { 255, 255, 255, 255 };
+    Color titleColor = { 255, 255, 255, 255 };
     renderer->drawTextCentered ("HELIGOLAND", { w / 2.0f, h / 3.0f }, 8.0f, titleColor);
 
     // Draw connected players
-    SDL_Color subtitleColor = { 200, 200, 200, 255 };
+    Color subtitleColor = { 200, 200, 200, 255 };
     int connectedCount = 0;
     for (auto& player : players)
     {
@@ -694,11 +701,11 @@ void Game::renderTitle()
     renderer->drawTextCentered (playerText, { w / 2.0f, h * 0.45f }, 3.0f, subtitleColor);
 
     // Draw game mode selector
-    SDL_Color modeColor = { 255, 220, 100, 255 };
+    Color modeColor = { 255, 220, 100, 255 };
     std::string modeText = gameMode == GameMode::FFA ? "FREE FOR ALL" : "2 VS 2";
     renderer->drawTextCentered (modeText, { w / 2.0f, h * 0.55f }, 4.0f, modeColor);
 
-    SDL_Color modeHintColor = { 120, 120, 120, 255 };
+    Color modeHintColor = { 120, 120, 120, 255 };
     renderer->drawTextCentered ("LB - RB TO CHANGE MODE", { w / 2.0f, h * 0.62f }, 1.5f, modeHintColor);
 
     // Draw player slots
@@ -709,7 +716,7 @@ void Game::renderTitle()
     for (int i = 0; i < NUM_SHIPS; ++i)
     {
         Vec2 slotPos = { startX + i * slotSpacing, slotY };
-        SDL_Color slotColor;
+        Color slotColor;
 
         if (players[i]->isConnected())
         {
@@ -744,7 +751,7 @@ void Game::renderTitle()
     }
 
     // Draw start instruction
-    SDL_Color instructColor = { 150, 150, 150, 255 };
+    Color instructColor = { 150, 150, 150, 255 };
     renderer->drawTextCentered ("PRESS ANY BUTTON TO START", { w / 2.0f, h * 0.90f }, 2.0f, instructColor);
 }
 
@@ -795,7 +802,7 @@ void Game::renderPlaying()
     // Draw crosshairs (on top of everything)
     for (const auto& ship : ships)
     {
-        if (ship && ship->isAlive())
+        if (ship && ship->isAlive() && ! ship->isSinking())
         {
             renderer->drawCrosshair (*ship);
         }
@@ -812,7 +819,7 @@ void Game::renderPlaying()
     int slot = 0;
     for (const auto& ship : ships)
     {
-        if (ship && ship->isAlive())
+        if (ship && ship->isAlive() && ! ship->isSinking())
         {
             // Check if any ship is under this HUD panel
             float hudX = hudStartX + slot * (hudWidth + hudSpacing);
@@ -854,7 +861,7 @@ void Game::renderGameOver()
     float w, h;
     getWindowSize (w, h);
 
-    SDL_Color textColor = { 255, 255, 255, 255 };
+    Color textColor = { 255, 255, 255, 255 };
 
     if (winnerIndex >= 0)
     {
@@ -928,31 +935,8 @@ float Game::getShipStartAngle (int index) const
 
 void Game::getWindowSize (float& width, float& height) const
 {
-    int w, h;
-    SDL_GetWindowSize (window, &w, &h);
-    width = (float) w;
-    height = (float) h;
-}
-
-void Game::setupLogicalPresentation()
-{
-    // Get logical size (points) and physical size (pixels)
-    int logicalW, logicalH;
-    int pixelW, pixelH;
-    SDL_GetWindowSize (window, &logicalW, &logicalH);
-    SDL_GetWindowSizeInPixels (window, &pixelW, &pixelH);
-
-    // Calculate scale for HiDPI displays
-    float scaleX = (float) pixelW / logicalW;
-    float scaleY = (float) pixelH / logicalH;
-
-    SDL_SetRenderScale (sdlRenderer, scaleX, scaleY);
-}
-
-void Game::handleWindowResize()
-{
-    // Update logical presentation when window is resized
-    setupLogicalPresentation();
+    width = (float) GetScreenWidth();
+    height = (float) GetScreenHeight();
 }
 
 int Game::getTeam (int playerIndex) const

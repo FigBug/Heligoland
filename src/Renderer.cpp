@@ -5,154 +5,96 @@
 #include <cmath>
 #include <vector>
 
-Renderer::Renderer (SDL_Renderer* renderer_)
-    : renderer (renderer_)
+Renderer::Renderer()
 {
     createNoiseTexture();
 }
 
 Renderer::~Renderer()
 {
-    if (noiseTexture)
+    if (noiseTexture1.id != 0)
     {
-        SDL_DestroyTexture (noiseTexture);
-        noiseTexture = nullptr;
+        UnloadTexture (noiseTexture1);
     }
-}
-
-void Renderer::createNoiseTexture()
-{
-    // Create a simple noise texture using a basic hash function
-    // Uses 2-3 shades of highlight for a subtle water effect
-    noiseTexture = SDL_CreateTexture (renderer, SDL_PIXELFORMAT_RGBA8888,
-                                      SDL_TEXTUREACCESS_STATIC,
-                                      noiseTextureSize, noiseTextureSize);
-    if (! noiseTexture)
-        return;
-
-    SDL_SetTextureBlendMode (noiseTexture, SDL_BLENDMODE_BLEND);
-
-    std::vector<uint32_t> pixels (noiseTextureSize * noiseTextureSize);
-
-    for (int y = 0; y < noiseTextureSize; ++y)
+    if (noiseTexture2.id != 0)
     {
-        for (int x = 0; x < noiseTextureSize; ++x)
-        {
-            // Simple hash-based noise
-            unsigned int hash = x * 374761393 + y * 668265263;
-            hash = (hash ^ (hash >> 13)) * 1274126177;
-            hash = hash ^ (hash >> 16);
-
-            int noise = hash % 100;
-
-            // Most pixels transparent, occasional highlights
-            uint8_t alpha = 0;
-            uint8_t brightness = 255;
-
-            if (noise < 8)
-            {
-                // Bright highlight (8% of pixels)
-                alpha = 25;
-                brightness = 255;
-            }
-            else if (noise < 20)
-            {
-                // Medium highlight (12% of pixels)
-                alpha = 15;
-                brightness = 200;
-            }
-            else if (noise < 35)
-            {
-                // Subtle highlight (15% of pixels)
-                alpha = 8;
-                brightness = 180;
-            }
-
-            // RGBA8888 format
-            pixels[y * noiseTextureSize + x] = (brightness << 24) | (brightness << 16) | (brightness << 8) | alpha;
-        }
+        UnloadTexture (noiseTexture2);
     }
-
-    SDL_UpdateTexture (noiseTexture, nullptr, pixels.data(), noiseTextureSize * sizeof (uint32_t));
 }
 
 void Renderer::clear()
 {
-    SDL_SetRenderDrawColor (renderer, 30, 60, 90, 255); // Dark ocean blue
-    SDL_RenderClear (renderer);
+    ClearBackground ({ 30, 60, 90, 255 }); // Dark ocean blue
 }
 
 void Renderer::drawWater (float time, float screenWidth, float screenHeight)
 {
     // Base ocean color
-    SDL_SetRenderDrawColor (renderer, 30, 60, 90, 255);
-    SDL_RenderClear (renderer);
+    ClearBackground ({ 30, 60, 90, 255 });
 
-    if (! noiseTexture)
-        return;
+    // Texture is displayed at 1.5x scale for larger coverage
+    float tileSize = noiseTextureSize * 1.5f;
 
-    // Calculate tile size (scale noise texture up for visibility)
-    float tileSize = (float) noiseTextureSize * 2.0f;
+    // Scrolling offsets for two layers - different speeds and directions
+    float scroll1X = std::fmod (time * 2.0f, tileSize);
+    float scroll1Y = std::fmod (time * 1.25f, tileSize);
+    float scroll2X = std::fmod (time * -1.5f, tileSize);
+    float scroll2Y = std::fmod (time * 2.25f, tileSize);
 
-    // Layer 1: Primary scroll direction (slow, diagonal)
-    float scroll1X = time * 8.0f;  // pixels per second
-    float scroll1Y = time * 5.0f;
-
-    // Layer 2: Secondary scroll (different direction, slightly faster)
-    float scroll2X = time * -6.0f;
-    float scroll2Y = time * 9.0f;
-
-    // Calculate how many tiles we need to cover the screen plus wrap margin
+    // Calculate tiles needed (add extra for scrolling)
     int tilesX = (int) (screenWidth / tileSize) + 2;
     int tilesY = (int) (screenHeight / tileSize) + 2;
 
-    // Draw first noise layer
-    float offsetX1 = std::fmod (scroll1X, tileSize);
-    float offsetY1 = std::fmod (scroll1Y, tileSize);
-
+    // Layer 1 - first noise texture
     for (int ty = -1; ty < tilesY; ++ty)
     {
         for (int tx = -1; tx < tilesX; ++tx)
         {
-            SDL_FRect destRect = {
-                tx * tileSize - offsetX1,
-                ty * tileSize - offsetY1,
-                tileSize,
-                tileSize
-            };
-            SDL_RenderTexture (renderer, noiseTexture, nullptr, &destRect);
+            float tileX = tx * tileSize - scroll1X;
+            float tileY = ty * tileSize - scroll1Y;
+
+            Rectangle source = { 0, 0, (float) noiseTextureSize, (float) noiseTextureSize };
+            Rectangle dest = { tileX, tileY, tileSize, tileSize };
+            DrawTexturePro (noiseTexture1, source, dest, { 0, 0 }, 0.0f, WHITE);
         }
     }
 
-    // Draw second noise layer (offset and different scroll)
-    float offsetX2 = std::fmod (scroll2X, tileSize);
-    float offsetY2 = std::fmod (scroll2Y, tileSize);
-
+    // Layer 2 - second noise texture with offset and different pattern
+    float layerOffset = tileSize * 0.37f; // Non-aligned offset
     for (int ty = -1; ty < tilesY; ++ty)
     {
         for (int tx = -1; tx < tilesX; ++tx)
         {
-            SDL_FRect destRect = {
-                tx * tileSize - offsetX2 + tileSize * 0.5f,
-                ty * tileSize - offsetY2 + tileSize * 0.5f,
-                tileSize,
-                tileSize
-            };
-            SDL_RenderTexture (renderer, noiseTexture, nullptr, &destRect);
+            float tileX = tx * tileSize - scroll2X + layerOffset;
+            float tileY = ty * tileSize - scroll2Y + layerOffset;
+
+            Rectangle source = { 0, 0, (float) noiseTextureSize, (float) noiseTextureSize };
+            Rectangle dest = { tileX, tileY, tileSize, tileSize };
+            DrawTexturePro (noiseTexture2, source, dest, { 0, 0 }, 0.0f, WHITE);
         }
     }
 }
 
 void Renderer::present()
 {
-    SDL_RenderPresent (renderer);
+    // raylib handles this in EndDrawing() - nothing to do here
 }
 
 void Renderer::drawShip (const Ship& ship)
 {
     Vec2 pos = ship.getPosition();
     float angle = ship.getAngle();
-    SDL_Color color = ship.getColor();
+    Color color = ship.getColor();
+
+    // Calculate alpha for sinking ships
+    float alpha = 1.0f;
+    if (ship.isSinking())
+    {
+        alpha = 1.0f - ship.getSinkProgress();
+    }
+
+    // Apply alpha to ship color
+    color.a = (unsigned char) (255 * alpha);
 
     // Draw ship hull - pointy bow, squarer stern
     drawShipHull (pos, ship.getLength(), ship.getWidth(), angle, color);
@@ -173,18 +115,18 @@ void Renderer::drawShip (const Ship& ship)
         Vec2 turretPos = pos + worldOffset;
 
         // Draw turret base (darker circle)
-        SDL_Color turretColor = {
-            (Uint8) (color.r * 0.6f),
-            (Uint8) (color.g * 0.6f),
-            (Uint8) (color.b * 0.6f),
-            255
+        Color turretColor = {
+            (unsigned char) (color.r * 0.6f),
+            (unsigned char) (color.g * 0.6f),
+            (unsigned char) (color.b * 0.6f),
+            (unsigned char) (255 * alpha)
         };
         drawFilledCircle (turretPos, turret.getRadius(), turretColor);
 
         // Draw barrel (line from turret center outward)
         float turretAngle = turret.getWorldAngle (angle);
         Vec2 barrelEnd = turretPos + Vec2::fromAngle (turretAngle) * turret.getBarrelLength();
-        SDL_Color barrelColor = { 50, 50, 50, 255 };
+        Color barrelColor = { 50, 50, 50, (unsigned char) (255 * alpha) };
         drawLine (turretPos, barrelEnd, barrelColor);
     }
 }
@@ -193,8 +135,8 @@ void Renderer::drawBubbleTrail (const Ship& ship)
 {
     for (const auto& bubble : ship.getBubbles())
     {
-        Uint8 alpha = (Uint8) (bubble.alpha * 128); // Start at 50% opacity, fade to 0
-        SDL_Color color = { 255, 255, 255, alpha };
+        unsigned char alpha = (unsigned char) (bubble.alpha * 128);
+        Color color = { 255, 255, 255, alpha };
         drawFilledCircle (bubble.position, bubble.radius, color);
     }
 }
@@ -203,15 +145,15 @@ void Renderer::drawSmoke (const Ship& ship)
 {
     for (const auto& s : ship.getSmoke())
     {
-        Uint8 alpha = (Uint8) (s.alpha * 180); // Start at 70% opacity, fade to 0
-        SDL_Color color = { 40, 40, 40, alpha }; // Dark grey/black smoke
+        unsigned char alpha = (unsigned char) (s.alpha * 180);
+        Color color = { 40, 40, 40, alpha };
         drawFilledCircle (s.position, s.radius, color);
     }
 }
 
 void Renderer::drawShell (const Shell& shell)
 {
-    SDL_Color color = { 255, 200, 50, 255 }; // Orange/yellow shell
+    Color color = { 255, 200, 50, 255 };
     drawFilledCircle (shell.getPosition(), shell.getRadius(), color);
 }
 
@@ -220,42 +162,42 @@ void Renderer::drawExplosion (const Explosion& explosion)
     float progress = explosion.getProgress();
 
     // Explosion expands quickly then fades
-    float radius = explosion.maxRadius * std::sqrt (progress); // Fast initial expansion
-    float alpha = 1.0f - progress; // Fade out
+    float radius = explosion.maxRadius * std::sqrt (progress);
+    float alpha = 1.0f - progress;
 
     if (explosion.isHit)
     {
         // Hit explosion - orange/yellow
-        SDL_Color outerColor = { 255, 150, 50, (Uint8) (alpha * 200) };
+        Color outerColor = { 255, 150, 50, (unsigned char) (alpha * 200) };
         drawCircle (explosion.position, radius, outerColor);
 
         if (radius > 5.0f)
         {
-            SDL_Color midColor = { 255, 220, 100, (Uint8) (alpha * 180) };
+            Color midColor = { 255, 220, 100, (unsigned char) (alpha * 180) };
             drawCircle (explosion.position, radius * 0.7f, midColor);
         }
 
         if (radius > 10.0f)
         {
-            SDL_Color coreColor = { 255, 255, 200, (Uint8) (alpha * 150) };
+            Color coreColor = { 255, 255, 200, (unsigned char) (alpha * 150) };
             drawFilledCircle (explosion.position, radius * 0.3f, coreColor);
         }
     }
     else
     {
         // Miss splash - blue/white
-        SDL_Color outerColor = { 100, 150, 255, (Uint8) (alpha * 200) };
+        Color outerColor = { 100, 150, 255, (unsigned char) (alpha * 200) };
         drawCircle (explosion.position, radius, outerColor);
 
         if (radius > 5.0f)
         {
-            SDL_Color midColor = { 150, 200, 255, (Uint8) (alpha * 180) };
+            Color midColor = { 150, 200, 255, (unsigned char) (alpha * 180) };
             drawCircle (explosion.position, radius * 0.7f, midColor);
         }
 
         if (radius > 10.0f)
         {
-            SDL_Color coreColor = { 220, 240, 255, (Uint8) (alpha * 150) };
+            Color coreColor = { 220, 240, 255, (unsigned char) (alpha * 150) };
             drawFilledCircle (explosion.position, radius * 0.3f, coreColor);
         }
     }
@@ -264,10 +206,10 @@ void Renderer::drawExplosion (const Explosion& explosion)
 void Renderer::drawCrosshair (const Ship& ship)
 {
     Vec2 position = ship.getCrosshairPosition();
-    SDL_Color shipColor = ship.getColor();
+    Color shipColor = ship.getColor();
 
     // Crosshair is grey if not ready to fire
-    SDL_Color crosshairColor = ship.isReadyToFire() ? shipColor : SDL_Color { 100, 100, 100, 255 };
+    Color crosshairColor = ship.isReadyToFire() ? shipColor : Color { 100, 100, 100, 255 };
 
     float size = 15.0f;
 
@@ -282,11 +224,11 @@ void Renderer::drawCrosshair (const Ship& ship)
     float barWidth = 40.0f;
     float barHeight = 4.0f;
     float barY = position.y + size + 8.0f;
-    SDL_Color barBg = { 60, 60, 60, 255 };
+    Color barBg = { 60, 60, 60, 255 };
     drawFilledRect ({ position.x - barWidth / 2.0f, barY }, barWidth, barHeight, barBg);
 
     float reloadPct = ship.getReloadProgress();
-    SDL_Color reloadColor = reloadPct >= 1.0f ? SDL_Color { 100, 255, 100, 255 } : SDL_Color { 255, 100, 100, 255 };
+    Color reloadColor = reloadPct >= 1.0f ? Color { 100, 255, 100, 255 } : Color { 255, 100, 100, 255 };
     drawFilledRect ({ position.x - barWidth / 2.0f, barY }, barWidth * reloadPct, barHeight, reloadColor);
 
     // Draw 4 turret indicator circles below reload bar
@@ -299,7 +241,7 @@ void Renderer::drawCrosshair (const Ship& ship)
     for (int i = 0; i < 4; ++i)
     {
         Vec2 circlePos = { startX + i * circleSpacing, circleY };
-        SDL_Color circleColor = turrets[i].isAimedAtTarget() ? shipColor : SDL_Color { 60, 60, 60, 255 };
+        Color circleColor = turrets[i].isAimedAtTarget() ? shipColor : Color { 60, 60, 60, 255 };
         drawFilledCircle (circlePos, circleRadius, circleColor);
     }
 }
@@ -314,12 +256,12 @@ void Renderer::drawShipHUD (const Ship& ship, int slot, int totalSlots, float sc
     float x = startX + slot * (hudWidth + spacing);
     float y = 10.0f;
 
-    Uint8 a = (Uint8) (alpha * 255);
+    unsigned char a = (unsigned char) (alpha * 255);
 
-    SDL_Color shipColor = { ship.getColor().r, ship.getColor().g, ship.getColor().b, a };
-    SDL_Color bgColor = { 30, 30, 30, (Uint8) (alpha * 200) };
-    SDL_Color barBg = { 60, 60, 60, a };
-    SDL_Color white = { 255, 255, 255, a };
+    Color shipColor = { ship.getColor().r, ship.getColor().g, ship.getColor().b, a };
+    Color bgColor = { 30, 30, 30, (unsigned char) (alpha * 200) };
+    Color barBg = { 60, 60, 60, a };
+    Color white = { 255, 255, 255, a };
 
     // Background
     drawFilledRect ({ x, y }, hudWidth, hudHeight, bgColor);
@@ -337,7 +279,7 @@ void Renderer::drawShipHUD (const Ship& ship, int slot, int totalSlots, float sc
     float healthY = y + 6;
     drawFilledRect ({ barX, healthY }, barWidth, barHeight, barBg);
     float healthPct = ship.getHealth() / ship.getMaxHealth();
-    SDL_Color healthColor = { (Uint8) (255 * (1 - healthPct)), (Uint8) (255 * healthPct), 0, a };
+    Color healthColor = { (unsigned char) (255 * (1 - healthPct)), (unsigned char) (255 * healthPct), 0, a };
     drawFilledRect ({ barX, healthY }, barWidth * healthPct, barHeight, healthColor);
 
     // Throttle bar (centered, negative goes left, positive goes right)
@@ -345,7 +287,7 @@ void Renderer::drawShipHUD (const Ship& ship, int slot, int totalSlots, float sc
     drawFilledRect ({ barX, throttleY }, barWidth, barHeight, barBg);
     float throttle = ship.getThrottle();
     float throttleCenter = barX + barWidth / 2.0f;
-    SDL_Color throttleColor = { 100, 150, 255, a };
+    Color throttleColor = { 100, 150, 255, a };
     if (throttle > 0)
     {
         drawFilledRect ({ throttleCenter, throttleY }, barWidth / 2.0f * throttle, barHeight, throttleColor);
@@ -363,7 +305,7 @@ void Renderer::drawShipHUD (const Ship& ship, int slot, int totalSlots, float sc
     drawFilledRect ({ barX, rudderY }, barWidth, barHeight, barBg);
     float rudder = ship.getRudder();
     float rudderCenter = barX + barWidth / 2.0f;
-    SDL_Color rudderColor = { 255, 200, 100, a };
+    Color rudderColor = { 255, 200, 100, a };
     if (rudder > 0)
     {
         drawFilledRect ({ rudderCenter, rudderY }, barWidth / 2.0f * rudder, barHeight, rudderColor);
@@ -384,7 +326,7 @@ void Renderer::drawWindIndicator (Vec2 wind, float screenWidth, float screenHeig
     Vec2 center = { screenWidth - 35, 35 };
 
     // Background circle
-    SDL_Color bgColor = { 30, 30, 30, 200 };
+    Color bgColor = { 30, 30, 30, 200 };
     drawFilledCircle (center, indicatorSize, bgColor);
     drawCircle (center, indicatorSize, { 100, 100, 100, 255 });
 
@@ -398,12 +340,11 @@ void Renderer::drawWindIndicator (Vec2 wind, float screenWidth, float screenHeig
         Vec2 arrowEnd = center + windDir * arrowLength;
 
         // Arrow shaft
-        SDL_Color arrowColor = { 200, 200, 255, 255 };
+        Color arrowColor = { 200, 200, 255, 255 };
         drawLine (center, arrowEnd, arrowColor);
 
         // Arrow head
         float headSize = 4.0f;
-        float headAngle = 0.5f;
         Vec2 head1 = arrowEnd - windDir * headSize + Vec2::fromAngle (windDir.toAngle() + pi * 0.5f) * headSize * 0.5f;
         Vec2 head2 = arrowEnd - windDir * headSize - Vec2::fromAngle (windDir.toAngle() + pi * 0.5f) * headSize * 0.5f;
         drawLine (arrowEnd, head1, arrowColor);
@@ -414,10 +355,8 @@ void Renderer::drawWindIndicator (Vec2 wind, float screenWidth, float screenHeig
     drawText ("WIND", { center.x - 6, center.y + indicatorSize + 3 }, 0.75f, { 150, 150, 150, 255 });
 }
 
-void Renderer::drawOval (Vec2 center, float width, float height, float angle, SDL_Color color)
+void Renderer::drawOval (Vec2 center, float width, float height, float angle, Color color)
 {
-    SDL_SetRenderDrawColor (renderer, color.r, color.g, color.b, color.a);
-
     float cosA = std::cos (angle);
     float sinA = std::sin (angle);
 
@@ -439,18 +378,13 @@ void Renderer::drawOval (Vec2 center, float width, float height, float angle, SD
         float rx2 = x2 * cosA - y2 * sinA;
         float ry2 = x2 * sinA + y2 * cosA;
 
-        SDL_RenderLine (renderer,
-                        center.x + rx1,
-                        center.y + ry1,
-                        center.x + rx2,
-                        center.y + ry2);
+        DrawLine ((int) (center.x + rx1), (int) (center.y + ry1),
+                  (int) (center.x + rx2), (int) (center.y + ry2), color);
     }
 }
 
-void Renderer::drawFilledOval (Vec2 center, float width, float height, float angle, SDL_Color color)
+void Renderer::drawFilledOval (Vec2 center, float width, float height, float angle, Color color)
 {
-    SDL_SetRenderDrawColor (renderer, color.r, color.g, color.b, color.a);
-
     float cosA = std::cos (angle);
     float sinA = std::sin (angle);
 
@@ -477,222 +411,128 @@ void Renderer::drawFilledOval (Vec2 center, float width, float height, float ang
             float wx2 = x2 * cosA - localY * sinA + center.x;
             float wy2 = x2 * sinA + localY * cosA + center.y;
 
-            SDL_RenderLine (renderer, wx1, wy1, wx2, wy2);
+            DrawLine ((int) wx1, (int) wy1, (int) wx2, (int) wy2, color);
         }
     }
 
     // Draw outline for better visibility
-    SDL_Color outlineColor = {
-        (Uint8) (color.r * 0.5f),
-        (Uint8) (color.g * 0.5f),
-        (Uint8) (color.b * 0.5f),
+    Color outlineColor = {
+        (unsigned char) (color.r * 0.5f),
+        (unsigned char) (color.g * 0.5f),
+        (unsigned char) (color.b * 0.5f),
         255
     };
     drawOval (center, width, height, angle, outlineColor);
 }
 
-void Renderer::drawShipHull (Vec2 center, float length, float width, float angle, SDL_Color color)
+void Renderer::drawShipHull (Vec2 center, float length, float width, float angle, Color color)
 {
-    SDL_SetRenderDrawBlendMode (renderer, SDL_BLENDMODE_BLEND);
-    SDL_SetRenderDrawColor (renderer, color.r, color.g, color.b, color.a);
-
     float cosA = std::cos (angle);
     float sinA = std::sin (angle);
 
     float halfLength = length / 2.0f;
     float halfWidth = width / 2.0f;
 
-    // Ship shape: pointy bow, curved sides, squarer stern
-    // Draw using horizontal scanlines from stern to bow
-
-    int numLines = (int) length;
-
-    for (int i = 0; i <= numLines; ++i)
+    // Helper lambda to get hull half-width at a given t position (-1 to 1)
+    auto getHalfWidth = [halfWidth] (float t) -> float
     {
-        // t goes from -1 (stern) to 1 (bow)
-        float t = (float) i / numLines * 2.0f - 1.0f;
-        float localX = t * halfLength;
-
-        float localHalfWidth;
-
         if (t > 0.7f)
         {
             // Bow section - taper to a point
-            float bowT = (t - 0.7f) / 0.3f; // 0 to 1 in bow section
-            localHalfWidth = halfWidth * (1.0f - bowT * bowT); // Quadratic taper to point
+            float bowT = (t - 0.7f) / 0.3f;
+            return halfWidth * (1.0f - bowT * bowT);
         }
         else if (t < -0.6f)
         {
             // Stern section - slightly rounded but more square
-            float sternT = (-t - 0.6f) / 0.4f; // 0 to 1 in stern section
-            localHalfWidth = halfWidth * (1.0f - sternT * sternT * 0.3f); // Gentle curve
+            float sternT = (-t - 0.6f) / 0.4f;
+            return halfWidth * (1.0f - sternT * sternT * 0.3f);
         }
         else
         {
             // Main body - full width with slight curve
-            float bodyT = (t + 0.6f) / 1.3f; // Normalized position in body
-            // Slight bulge in the middle
-            localHalfWidth = halfWidth * (1.0f + 0.05f * std::sin (bodyT * pi));
+            float bodyT = (t + 0.6f) / 1.3f;
+            return halfWidth * (1.0f + 0.05f * std::sin (bodyT * pi));
         }
-
-        if (localHalfWidth > 0.5f)
-        {
-            // Two endpoints of the scanline in local coords
-            float y1 = -localHalfWidth;
-            float y2 = localHalfWidth;
-
-            // Rotate to world coords
-            float wx1 = localX * cosA - y1 * sinA + center.x;
-            float wy1 = localX * sinA + y1 * cosA + center.y;
-            float wx2 = localX * cosA - y2 * sinA + center.x;
-            float wy2 = localX * sinA + y2 * cosA + center.y;
-
-            SDL_RenderLine (renderer, wx1, wy1, wx2, wy2);
-        }
-    }
-
-    // Draw outline for better visibility
-    SDL_Color outlineColor = {
-        (Uint8) (color.r * 0.5f),
-        (Uint8) (color.g * 0.5f),
-        (Uint8) (color.b * 0.5f),
-        255
     };
-    SDL_SetRenderDrawColor (renderer, outlineColor.r, outlineColor.g, outlineColor.b, outlineColor.a);
 
-    // Draw outline by tracing the hull shape
-    std::vector<Vec2> hullPoints;
-    int outlineSegments = 32;
+    // Build hull outline points
+    std::vector<Vector2> hullPoints;
+    int segments = 32;
 
-    for (int i = 0; i <= outlineSegments; ++i)
+    // Top edge (stern to bow)
+    for (int i = 0; i <= segments; ++i)
     {
-        float t = (float) i / outlineSegments * 2.0f - 1.0f;
+        float t = (float) i / segments * 2.0f - 1.0f;
         float localX = t * halfLength;
+        float localY = getHalfWidth (t);
 
-        float localHalfWidth;
-
-        if (t > 0.7f)
-        {
-            float bowT = (t - 0.7f) / 0.3f;
-            localHalfWidth = halfWidth * (1.0f - bowT * bowT);
-        }
-        else if (t < -0.6f)
-        {
-            float sternT = (-t - 0.6f) / 0.4f;
-            localHalfWidth = halfWidth * (1.0f - sternT * sternT * 0.3f);
-        }
-        else
-        {
-            float bodyT = (t + 0.6f) / 1.3f;
-            localHalfWidth = halfWidth * (1.0f + 0.05f * std::sin (bodyT * pi));
-        }
-
-        // Top edge (positive Y in local)
-        float wx = localX * cosA - localHalfWidth * sinA + center.x;
-        float wy = localX * sinA + localHalfWidth * cosA + center.y;
+        float wx = localX * cosA - localY * sinA + center.x;
+        float wy = localX * sinA + localY * cosA + center.y;
         hullPoints.push_back ({ wx, wy });
     }
 
-    // Add bottom edge in reverse
-    for (int i = outlineSegments; i >= 0; --i)
+    // Bottom edge (bow to stern)
+    for (int i = segments; i >= 0; --i)
     {
-        float t = (float) i / outlineSegments * 2.0f - 1.0f;
+        float t = (float) i / segments * 2.0f - 1.0f;
         float localX = t * halfLength;
+        float localY = -getHalfWidth (t);
 
-        float localHalfWidth;
-
-        if (t > 0.7f)
-        {
-            float bowT = (t - 0.7f) / 0.3f;
-            localHalfWidth = halfWidth * (1.0f - bowT * bowT);
-        }
-        else if (t < -0.6f)
-        {
-            float sternT = (-t - 0.6f) / 0.4f;
-            localHalfWidth = halfWidth * (1.0f - sternT * sternT * 0.3f);
-        }
-        else
-        {
-            float bodyT = (t + 0.6f) / 1.3f;
-            localHalfWidth = halfWidth * (1.0f + 0.05f * std::sin (bodyT * pi));
-        }
-
-        // Bottom edge (negative Y in local)
-        float wx = localX * cosA - (-localHalfWidth) * sinA + center.x;
-        float wy = localX * sinA + (-localHalfWidth) * cosA + center.y;
+        float wx = localX * cosA - localY * sinA + center.x;
+        float wy = localX * sinA + localY * cosA + center.y;
         hullPoints.push_back ({ wx, wy });
     }
 
-    // Draw outline
+    // Draw filled polygon using triangle fan from center
+    Vector2 centerVec = { center.x, center.y };
     for (size_t i = 0; i < hullPoints.size(); ++i)
     {
         size_t next = (i + 1) % hullPoints.size();
-        SDL_RenderLine (renderer, hullPoints[i].x, hullPoints[i].y,
-                        hullPoints[next].x, hullPoints[next].y);
+        DrawTriangle (centerVec, hullPoints[i], hullPoints[next], color);
     }
-}
 
-void Renderer::drawCircle (Vec2 center, float radius, SDL_Color color)
-{
-    SDL_SetRenderDrawColor (renderer, color.r, color.g, color.b, color.a);
+    // Draw smooth outline
+    Color outlineColor = {
+        (unsigned char) (color.r * 0.5f),
+        (unsigned char) (color.g * 0.5f),
+        (unsigned char) (color.b * 0.5f),
+        color.a
+    };
 
-    int segments = 24;
-    for (int i = 0; i < segments; ++i)
+    for (size_t i = 0; i < hullPoints.size(); ++i)
     {
-        float theta1 = (2.0f * pi * i) / segments;
-        float theta2 = (2.0f * pi * (i + 1)) / segments;
-
-        float x1 = center.x + radius * std::cos (theta1);
-        float y1 = center.y + radius * std::sin (theta1);
-        float x2 = center.x + radius * std::cos (theta2);
-        float y2 = center.y + radius * std::sin (theta2);
-
-        SDL_RenderLine (renderer, x1, y1, x2, y2);
+        size_t next = (i + 1) % hullPoints.size();
+        DrawLineEx (hullPoints[i], hullPoints[next], 1.5f, outlineColor);
     }
 }
 
-void Renderer::drawFilledCircle (Vec2 center, float radius, SDL_Color color)
+void Renderer::drawCircle (Vec2 center, float radius, Color color)
 {
-    SDL_SetRenderDrawBlendMode (renderer, SDL_BLENDMODE_BLEND);
-    SDL_SetRenderDrawColor (renderer, color.r, color.g, color.b, color.a);
-
-    // Draw filled circle using horizontal scanlines
-    for (int y = (int) -radius; y <= (int) radius; ++y)
-    {
-        float halfWidth = std::sqrt (radius * radius - y * y);
-        SDL_RenderLine (renderer,
-                        center.x - halfWidth,
-                        center.y + y,
-                        center.x + halfWidth,
-                        center.y + y);
-    }
+    DrawCircleLinesV ({ center.x, center.y }, radius, color);
 }
 
-void Renderer::drawLine (Vec2 start, Vec2 end, SDL_Color color)
+void Renderer::drawFilledCircle (Vec2 center, float radius, Color color)
 {
-    SDL_SetRenderDrawBlendMode (renderer, SDL_BLENDMODE_BLEND);
-    SDL_SetRenderDrawColor (renderer, color.r, color.g, color.b, color.a);
-    SDL_RenderLine (renderer, start.x, start.y, end.x, end.y);
+    DrawCircleV ({ center.x, center.y }, radius, color);
 }
 
-void Renderer::drawRect (Vec2 topLeft, float width, float height, SDL_Color color)
+void Renderer::drawLine (Vec2 start, Vec2 end, Color color)
 {
-    SDL_SetRenderDrawBlendMode (renderer, SDL_BLENDMODE_BLEND);
-    SDL_SetRenderDrawColor (renderer, color.r, color.g, color.b, color.a);
-    SDL_FRect rect = { topLeft.x, topLeft.y, width, height };
-    SDL_RenderRect (renderer, &rect);
+    DrawLineV ({ start.x, start.y }, { end.x, end.y }, color);
 }
 
-void Renderer::drawFilledRect (Vec2 topLeft, float width, float height, SDL_Color color)
+void Renderer::drawRect (Vec2 topLeft, float width, float height, Color color)
 {
-    SDL_SetRenderDrawBlendMode (renderer, SDL_BLENDMODE_BLEND);
-    SDL_SetRenderDrawColor (renderer, color.r, color.g, color.b, color.a);
-    SDL_FRect rect = { topLeft.x, topLeft.y, width, height };
-    SDL_RenderFillRect (renderer, &rect);
+    DrawRectangleLines ((int) topLeft.x, (int) topLeft.y, (int) width, (int) height, color);
+}
+
+void Renderer::drawFilledRect (Vec2 topLeft, float width, float height, Color color)
+{
+    DrawRectangle ((int) topLeft.x, (int) topLeft.y, (int) width, (int) height, color);
 }
 
 // Simple 5x7 bitmap font patterns (each char is 5 wide, 7 tall)
-// Returns glyph data for a character, or empty glyph for unsupported chars
 static const uint8_t* getGlyph (unsigned char c)
 {
     static const uint8_t empty[7] = { 0, 0, 0, 0, 0, 0, 0 };
@@ -787,12 +627,13 @@ static const uint8_t* getGlyph (unsigned char c)
     }
 }
 
-void Renderer::drawChar (char c, Vec2 position, float scale, SDL_Color color)
+void Renderer::drawChar (char c, Vec2 position, float scale, Color color)
 {
-    SDL_SetRenderDrawColor (renderer, color.r, color.g, color.b, color.a);
-
     unsigned char uc = (unsigned char) c;
     const uint8_t* glyph = getGlyph (uc);
+
+    // Use ceiling for size to ensure no gaps between pixels
+    float pixelSize = std::ceil (scale);
 
     for (int row = 0; row < 7; ++row)
     {
@@ -801,19 +642,19 @@ void Renderer::drawChar (char c, Vec2 position, float scale, SDL_Color color)
         {
             if (rowBits & (1 << (4 - col)))
             {
-                SDL_FRect pixel = {
+                Rectangle rect = {
                     position.x + col * scale,
                     position.y + row * scale,
-                    scale,
-                    scale
+                    pixelSize,
+                    pixelSize
                 };
-                SDL_RenderFillRect (renderer, &pixel);
+                DrawRectangleRec (rect, color);
             }
         }
     }
 }
 
-void Renderer::drawText (const std::string& text, Vec2 position, float scale, SDL_Color color)
+void Renderer::drawText (const std::string& text, Vec2 position, float scale, Color color)
 {
     float charWidth = 6 * scale; // 5 pixels + 1 spacing
     Vec2 pos = position;
@@ -826,7 +667,7 @@ void Renderer::drawText (const std::string& text, Vec2 position, float scale, SD
     }
 }
 
-void Renderer::drawTextCentered (const std::string& text, Vec2 center, float scale, SDL_Color color)
+void Renderer::drawTextCentered (const std::string& text, Vec2 center, float scale, Color color)
 {
     float charWidth = 6 * scale;
     float charHeight = 7 * scale;
@@ -838,4 +679,63 @@ void Renderer::drawTextCentered (const std::string& text, Vec2 center, float sca
     };
 
     drawText (text, topLeft, scale, color);
+}
+
+void Renderer::createNoiseTexture()
+{
+    // Create two noise textures for water highlights with different patterns
+    // This reduces visible repetition when tiling
+
+    auto generateNoiseImage = [] (unsigned int seed) -> Image
+    {
+        Image noiseImage = GenImageColor (noiseTextureSize, noiseTextureSize, { 0, 0, 0, 0 });
+
+        // Simple LCG random number generator
+        auto nextRandom = [&seed]() -> unsigned int
+        {
+            seed = seed * 1103515245 + 12345;
+            return (seed >> 16) & 0x7FFF;
+        };
+
+        for (int y = 0; y < noiseTextureSize; ++y)
+        {
+            for (int x = 0; x < noiseTextureSize; ++x)
+            {
+                unsigned int r = nextRandom() % 100;
+                Color pixelColor = { 0, 0, 0, 0 };
+
+                if (r < 8)
+                {
+                    // Bright highlight (8%)
+                    pixelColor = { 255, 255, 255, 30 };
+                }
+                else if (r < 20)
+                {
+                    // Medium highlight (12%)
+                    pixelColor = { 220, 220, 255, 20 };
+                }
+                else if (r < 35)
+                {
+                    // Subtle highlight (15%)
+                    pixelColor = { 180, 200, 220, 12 };
+                }
+
+                ImageDrawPixel (&noiseImage, x, y, pixelColor);
+            }
+        }
+
+        return noiseImage;
+    };
+
+    // Create first texture
+    Image noiseImage1 = generateNoiseImage (12345);
+    noiseTexture1 = LoadTextureFromImage (noiseImage1);
+    UnloadImage (noiseImage1);
+    SetTextureFilter (noiseTexture1, TEXTURE_FILTER_BILINEAR);
+
+    // Create second texture with different seed
+    Image noiseImage2 = generateNoiseImage (67890);
+    noiseTexture2 = LoadTextureFromImage (noiseImage2);
+    UnloadImage (noiseImage2);
+    SetTextureFilter (noiseTexture2, TEXTURE_FILTER_BILINEAR);
 }
