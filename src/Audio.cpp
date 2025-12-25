@@ -94,15 +94,18 @@ bool Audio::init()
         return false;
     }
 
-    cannonSound = LoadSound (getResourcePath ("assets/cannon.wav").c_str());
-    splashSound = LoadSound (getResourcePath ("assets/splash.wav").c_str());
-    explosionSound = LoadSound (getResourcePath ("assets/explosion.wav").c_str());
-    collisionSound = LoadSound (getResourcePath ("assets/collision.wav").c_str());
-    engineSound = LoadMusicStream (getResourcePath ("assets/engine.wav").c_str());
+    cannonSounds[0] = LoadSound (getResourcePath ("assets/Cannon_1.wav").c_str());
+    cannonSounds[1] = LoadSound (getResourcePath ("assets/Cannon_2.wav").c_str());
+    splashSound = LoadSound (getResourcePath ("assets/Cannon_Miss.wav").c_str());
+    explosionSounds[0] = LoadSound (getResourcePath ("assets/Cannon_Hit1.wav").c_str());
+    explosionSounds[1] = LoadSound (getResourcePath ("assets/Cannon_Hit2.wav").c_str());
+    collisionSound = LoadSound (getResourcePath ("assets/ShipCollide.wav").c_str());
+    engineSound = LoadMusicStream (getResourcePath ("assets/Engine_1.wav").c_str());
 
-    if (cannonSound.frameCount == 0 || splashSound.frameCount == 0 ||
-        explosionSound.frameCount == 0 || collisionSound.frameCount == 0 ||
-        engineSound.frameCount == 0)
+    if (cannonSounds[0].frameCount == 0 || cannonSounds[1].frameCount == 0 ||
+        splashSound.frameCount == 0 ||
+        explosionSounds[0].frameCount == 0 || explosionSounds[1].frameCount == 0 ||
+        collisionSound.frameCount == 0 || engineSound.frameCount == 0)
     {
         return false;
     }
@@ -120,9 +123,11 @@ void Audio::shutdown()
 {
     if (initialized)
     {
-        UnloadSound (cannonSound);
+        UnloadSound (cannonSounds[0]);
+        UnloadSound (cannonSounds[1]);
         UnloadSound (splashSound);
-        UnloadSound (explosionSound);
+        UnloadSound (explosionSounds[0]);
+        UnloadSound (explosionSounds[1]);
         UnloadSound (collisionSound);
         UnloadMusicStream (engineSound);
         CloseAudioDevice();
@@ -169,7 +174,8 @@ void Audio::playCannon (float screenX, float screenWidth)
     if (gunSilenceTimer > 0.0f)
         return;
 
-    playWithVariation (cannonSound, screenX, screenWidth);
+    int idx = rng() % 2;
+    playWithVariation (cannonSounds[idx], screenX, screenWidth);
     gunSilenceTimer = Config::audioGunSilenceDuration;
 }
 
@@ -186,7 +192,8 @@ void Audio::playExplosion (float screenX, float screenWidth)
     if (! initialized)
         return;
 
-    playWithVariation (explosionSound, screenX, screenWidth);
+    int idx = rng() % 2;
+    playWithVariation (explosionSounds[idx], screenX, screenWidth);
 }
 
 void Audio::playCollision (float screenX, float screenWidth)

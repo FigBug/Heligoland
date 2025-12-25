@@ -25,9 +25,12 @@ bool Game::init()
     }
 
     // Create players (but not ships yet - those are created when game starts)
-    for (int i = 0; i < NUM_SHIPS; ++i)
+    for (int i = 0; i < MAX_PLAYERS; ++i)
     {
         players[i] = std::make_unique<Player> (i);
+    }
+    for (int i = 0; i < MAX_SHIPS; ++i)
+    {
         aiControllers[i] = std::make_unique<AIController>();
     }
 
@@ -89,9 +92,9 @@ void Game::update (float dt)
     }
 
     // Update players for gamepad detection
-    for (auto& player : players)
+    for (int i = 0; i < MAX_PLAYERS; ++i)
     {
-        player->update();
+        players[i]->update();
     }
 
     switch (state)
@@ -171,11 +174,12 @@ bool Game::anyButtonPressed()
 void Game::startGame()
 {
     // Create ships at starting positions
-    bool isTeamMode = (gameMode == GameMode::Teams);
+    bool isTeamMode = (gameMode == GameMode::Teams || gameMode == GameMode::Battle);
     int numShips = getNumShipsForMode();
     for (int i = 0; i < numShips; ++i)
     {
-        ships[i] = std::make_unique<Ship> (i, getShipStartPosition (i), getShipStartAngle (i), isTeamMode);
+        int team = isTeamMode ? getTeam (i) : -1;
+        ships[i] = std::make_unique<Ship> (i, getShipStartPosition (i), getShipStartAngle (i), team);
     }
 
     shells.clear();
@@ -235,9 +239,9 @@ void Game::updatePlaying (float dt)
 
     // Update ships
     int numShips = getNumShipsForMode();
-    for (int i = 0; i < numShips; ++i)
+    for (int shipIdx = 0; shipIdx < numShips; ++shipIdx)
     {
-        if (! ships[i] || ! ships[i]->isAlive())
+        if (! ships[shipIdx] || ! ships[shipIdx]->isAlive())
         {
             continue; // Skip dead ships
         }
@@ -245,12 +249,16 @@ void Game::updatePlaying (float dt)
         Vec2 moveInput, aimInput;
         bool fireInput = false;
 
-        if (players[i]->isConnected())
+        // Check if this ship is controlled by a human player
+        int playerIdx = getPlayerIndexForShip (shipIdx);
+        bool isHumanControlled = (playerIdx >= 0 && players[playerIdx]->isConnected());
+
+        if (isHumanControlled)
         {
-            moveInput = players[i]->getMoveInput();
-            aimInput = players[i]->getAimInput();
+            moveInput = players[playerIdx]->getMoveInput();
+            aimInput = players[playerIdx]->getAimInput();
             // Only accept fire input after start delay
-            fireInput = (gameStartDelay <= 0) && players[i]->getFireInput();
+            fireInput = (gameStartDelay <= 0) && players[playerIdx]->getFireInput();
         }
         else
         {
@@ -258,32 +266,32 @@ void Game::updatePlaying (float dt)
             std::vector<const Ship*> enemies;
             for (int j = 0; j < numShips; ++j)
             {
-                if (areEnemies (i, j) && ships[j] && ships[j]->isAlive() && ! ships[j]->isSinking())
+                if (areEnemies (shipIdx, j) && ships[j] && ships[j]->isAlive() && ! ships[j]->isSinking())
                 {
                     enemies.push_back (ships[j].get());
                 }
             }
 
-            aiControllers[i]->update (dt, *ships[i], enemies, arenaWidth, arenaHeight);
-            moveInput = aiControllers[i]->getMoveInput();
-            aimInput = aiControllers[i]->getAimInput();
-            fireInput = aiControllers[i]->getFireInput();
+            aiControllers[shipIdx]->update (dt, *ships[shipIdx], enemies, shells, arenaWidth, arenaHeight);
+            moveInput = aiControllers[shipIdx]->getMoveInput();
+            aimInput = aiControllers[shipIdx]->getAimInput();
+            fireInput = aiControllers[shipIdx]->getFireInput();
         }
 
-        ships[i]->update (dt, moveInput, aimInput, fireInput, arenaWidth, arenaHeight, wind);
+        ships[shipIdx]->update (dt, moveInput, aimInput, fireInput, arenaWidth, arenaHeight, wind);
 
         // Set crosshair directly for mouse aiming
-        if (players[i]->isUsingMouse())
+        if (isHumanControlled && players[playerIdx]->isUsingMouse())
         {
-            ships[i]->setCrosshairPosition (players[i]->getMousePosition());
+            ships[shipIdx]->setCrosshairPosition (players[playerIdx]->getMousePosition());
         }
 
         // Collect pending shells from ship
-        auto& pendingShells = ships[i]->getPendingShells();
+        auto& pendingShells = ships[shipIdx]->getPendingShells();
         if (! pendingShells.empty() && audio)
         {
             // Play cannon sound at ship position
-            audio->playCannon (ships[i]->getPosition().x, arenaWidth);
+            audio->playCannon (ships[shipIdx]->getPosition().x, arenaWidth);
         }
         for (auto& shell : pendingShells)
         {
@@ -299,7 +307,7 @@ void Game::updatePlaying (float dt)
         int aliveCount = 0;
         for (int i = 0; i < numShips; ++i)
         {
-            if (ships[i] && ships[i]->isAlive())
+            if (ships[i] && ships[i]->isAlive() && ! ships[i]->isSinking())
             {
                 totalThrottle += std::abs (ships[i]->getThrottle());
                 aliveCount++;
@@ -338,7 +346,7 @@ void Game::updateGameOver (float dt)
     int numShips = getNumShipsForMode();
     for (int i = 0; i < numShips; ++i)
     {
-        if (ships[i] && ships[i]->isAlive())
+        if (ships[i] && ships[i]->isVisible())
         {
             ships[i]->update (dt, { 0, 0 }, { 0, 0 }, false, arenaWidth, arenaHeight, wind);
         }
@@ -603,13 +611,14 @@ void Game::checkGameOver()
         return ships[i] && ships[i]->isAlive() && ! ships[i]->isSinking();
     };
 
-    if (gameMode == GameMode::Teams)
+    if (gameMode == GameMode::Teams || gameMode == GameMode::Battle)
     {
         // Count fighting ships per team
         int team0Alive = 0;
         int team1Alive = 0;
+        int numShips = getNumShipsForMode();
 
-        for (int i = 0; i < NUM_SHIPS; ++i)
+        for (int i = 0; i < numShips; ++i)
         {
             if (canFight (i))
             {
@@ -722,52 +731,108 @@ void Game::renderTitle()
         modeText = "FREE FOR ALL";
     else if (gameMode == GameMode::Teams)
         modeText = "2 VS 2";
-    else
+    else if (gameMode == GameMode::Duel)
         modeText = "1 VS 1";
+    else
+        modeText = "BATTLE 6 VS 6";
     renderer->drawTextCentered (modeText, { w / 2.0f, h * 0.55f }, 4.0f, Config::colorModeText);
 
     renderer->drawTextCentered ("LEFT - RIGHT TO CHANGE MODE", { w / 2.0f, h * 0.62f }, 1.5f, Config::colorGreySubtle);
 
-    // Draw player slots (only show slots for current mode)
-    int numSlots = getNumShipsForMode();
+    // Draw player slots (only show human-controllable slots)
+    int numSlots = (gameMode == GameMode::Battle) ? MAX_PLAYERS : getNumShipsForMode();
     float slotY = h * 0.72f;
     float slotSpacing = 80.0f;
-    float startX = w / 2.0f - (numSlots - 1) * slotSpacing / 2.0f;
 
-    for (int i = 0; i < numSlots; ++i)
+    if (gameMode == GameMode::Teams || gameMode == GameMode::Battle)
     {
-        Vec2 slotPos = { startX + i * slotSpacing, slotY };
-        Color slotColor;
+        // Battle mode: show 2 slots per team with team labels
+        float teamSpacing = 150.0f;
+        float startX = w / 2.0f - teamSpacing / 2.0f - slotSpacing / 2.0f;
 
-        if (players[i]->isConnected())
+        // Team 1 slots (players 0, 1)
+        renderer->drawTextCentered ("TEAM 1", { startX + slotSpacing / 2.0f, slotY - 45.0f }, 2.0f, Config::colorShipRed);
+        for (int i = 0; i < 2; ++i)
         {
-            // Use player color
-            switch (i)
+            Vec2 slotPos = { startX + i * slotSpacing, slotY };
+            if (players[i]->isConnected())
             {
-                case 0:
-                    slotColor = Config::colorShipRed;
-                    break;
-                case 1:
-                    slotColor = Config::colorShipBlue;
-                    break;
-                case 2:
-                    slotColor = Config::colorShipGreen;
-                    break;
-                case 3:
-                    slotColor = Config::colorShipYellow;
-                    break;
-                default:
-                    slotColor = Config::colorGrey;
-                    break;
+                Color slotColor = (i == 0) ? Config::colorShipRed : Config::colorShipBlue;
+                renderer->drawFilledRect ({ slotPos.x - 25, slotPos.y - 25 }, 50, 50, slotColor);
+                renderer->drawTextCentered ("P" + std::to_string (i + 1), slotPos, 3.0f, Config::colorBlack);
             }
-            renderer->drawFilledRect ({ slotPos.x - 25, slotPos.y - 25 }, 50, 50, slotColor);
-            renderer->drawTextCentered ("P" + std::to_string (i + 1), slotPos, 3.0f, Config::colorBlack);
+            else
+            {
+                renderer->drawRect ({ slotPos.x - 25, slotPos.y - 25 }, 50, 50, Config::colorGreyDark);
+                renderer->drawTextCentered ("AI", slotPos, 2.0f, Config::colorGreyDark);
+            }
         }
-        else
+
+        // Team 2 slots (players 2, 3)
+        float team2StartX = w / 2.0f + teamSpacing / 2.0f - slotSpacing / 2.0f;
+        renderer->drawTextCentered ("TEAM 2", { team2StartX + slotSpacing / 2.0f, slotY - 45.0f }, 2.0f, Config::colorShipBlue);
+        for (int i = 2; i < 4; ++i)
         {
-            slotColor = Config::colorGreyDark;
-            renderer->drawRect ({ slotPos.x - 25, slotPos.y - 25 }, 50, 50, slotColor);
-            renderer->drawTextCentered ("AI", slotPos, 2.0f, slotColor);
+            Vec2 slotPos = { team2StartX + (i - 2) * slotSpacing, slotY };
+            if (players[i]->isConnected())
+            {
+                Color slotColor = (i == 2) ? Config::colorShipGreen : Config::colorShipYellow;
+                renderer->drawFilledRect ({ slotPos.x - 25, slotPos.y - 25 }, 50, 50, slotColor);
+                renderer->drawTextCentered ("P" + std::to_string (i + 1), slotPos, 3.0f, Config::colorBlack);
+            }
+            else
+            {
+                renderer->drawRect ({ slotPos.x - 25, slotPos.y - 25 }, 50, 50, Config::colorGreyDark);
+                renderer->drawTextCentered ("AI", slotPos, 2.0f, Config::colorGreyDark);
+            }
+        }
+
+        if (gameMode == GameMode::Battle)
+        {
+            // Show "+4 AI" indicators for each team
+            renderer->drawTextCentered ("+4 AI", { startX + slotSpacing / 2.0f, slotY + 45.0f }, 1.5f, Config::colorGreySubtle);
+            renderer->drawTextCentered ("+4 AI", { team2StartX + slotSpacing / 2.0f, slotY + 45.0f }, 1.5f, Config::colorGreySubtle);
+        }
+    }
+    else
+    {
+        float startX = w / 2.0f - (numSlots - 1) * slotSpacing / 2.0f;
+
+        for (int i = 0; i < numSlots; ++i)
+        {
+            Vec2 slotPos = { startX + i * slotSpacing, slotY };
+            Color slotColor;
+
+            if (players[i]->isConnected())
+            {
+                // Use player color
+                switch (i)
+                {
+                    case 0:
+                        slotColor = Config::colorShipRed;
+                        break;
+                    case 1:
+                        slotColor = Config::colorShipBlue;
+                        break;
+                    case 2:
+                        slotColor = Config::colorShipGreen;
+                        break;
+                    case 3:
+                        slotColor = Config::colorShipYellow;
+                        break;
+                    default:
+                        slotColor = Config::colorGrey;
+                        break;
+                }
+                renderer->drawFilledRect ({ slotPos.x - 25, slotPos.y - 25 }, 50, 50, slotColor);
+                renderer->drawTextCentered ("P" + std::to_string (i + 1), slotPos, 3.0f, Config::colorBlack);
+            }
+            else
+            {
+                slotColor = Config::colorGreyDark;
+                renderer->drawRect ({ slotPos.x - 25, slotPos.y - 25 }, 50, 50, slotColor);
+                renderer->drawTextCentered ("AI", slotPos, 2.0f, slotColor);
+            }
         }
     }
 
@@ -783,7 +848,7 @@ void Game::renderPlaying()
     // Draw bubble trails first (behind everything)
     for (const auto& ship : ships)
     {
-        if (ship && ship->isAlive())
+        if (ship && ship->isVisible())
         {
             renderer->drawBubbleTrail (*ship);
         }
@@ -792,7 +857,7 @@ void Game::renderPlaying()
     // Draw ships
     for (const auto& ship : ships)
     {
-        if (ship && ship->isAlive())
+        if (ship && ship->isVisible())
         {
             renderer->drawShip (*ship);
         }
@@ -801,7 +866,7 @@ void Game::renderPlaying()
     // Draw smoke (above ships)
     for (const auto& ship : ships)
     {
-        if (ship && ship->isAlive())
+        if (ship && ship->isVisible())
         {
             renderer->drawSmoke (*ship);
         }
@@ -828,19 +893,33 @@ void Game::renderPlaying()
         }
     }
 
-    // Draw HUD for each ship
+    // Draw HUD for ships (in Battle mode, only show human-controlled ships)
     int numShips = getNumShipsForMode();
+    std::vector<int> hudShipIndices;
+
+    if (gameMode == GameMode::Battle)
+    {
+        // Only show HUDs for potential human ships: 0, 1, 6, 7
+        hudShipIndices = { 0, 1, 6, 7 };
+    }
+    else
+    {
+        for (int i = 0; i < numShips; ++i)
+            hudShipIndices.push_back (i);
+    }
+
+    int numHuds = (int) hudShipIndices.size();
     float hudWidth = 200.0f;
     float hudHeight = 50.0f;
     float hudSpacing = 20.0f;
-    float hudTotalWidth = numShips * hudWidth + (numShips - 1) * hudSpacing;
+    float hudTotalWidth = numHuds * hudWidth + (numHuds - 1) * hudSpacing;
     float hudStartX = (w - hudTotalWidth) / 2.0f;
     float hudY = 10.0f;
 
     int slot = 0;
-    for (int i = 0; i < numShips; ++i)
+    for (int shipIdx : hudShipIndices)
     {
-        const auto& ship = ships[i];
+        const auto& ship = ships[shipIdx];
         if (ship && ship->isAlive() && ! ship->isSinking())
         {
             // Check if any ship is under this HUD panel
@@ -849,7 +928,7 @@ void Game::renderPlaying()
 
             for (const auto& otherShip : ships)
             {
-                if (otherShip && otherShip->isAlive())
+                if (otherShip && otherShip->isVisible())
                 {
                     Vec2 pos = otherShip->getPosition();
                     // Check if ship position is within HUD bounds (with some margin)
@@ -863,13 +942,37 @@ void Game::renderPlaying()
                 }
             }
 
-            renderer->drawShipHUD (*ship, slot, numShips, w, alpha);
+            renderer->drawShipHUD (*ship, slot, numHuds, w, alpha);
         }
         slot++;
     }
 
     // Draw wind indicator
     renderer->drawWindIndicator (wind, w, h);
+
+    // Draw team ship counters for Battle mode
+    if (gameMode == GameMode::Battle)
+    {
+        int team1Alive = 0;
+        int team2Alive = 0;
+        for (int i = 0; i < numShips; ++i)
+        {
+            if (ships[i] && ships[i]->isAlive() && ! ships[i]->isSinking())
+            {
+                if (getTeam (i) == 0)
+                    team1Alive++;
+                else
+                    team2Alive++;
+            }
+        }
+
+        std::string team1Text = std::to_string (team1Alive);
+        std::string team2Text = std::to_string (team2Alive);
+
+        // Draw on left and right sides of screen
+        renderer->drawTextCentered (team1Text, { 50.0f, h / 2.0f }, 6.0f, Config::colorTeam1Dark);
+        renderer->drawTextCentered (team2Text, { w - 50.0f, h / 2.0f }, 6.0f, Config::colorTeam2Dark);
+    }
 }
 
 void Game::renderGameOver()
@@ -889,7 +992,7 @@ void Game::renderGameOver()
     if (winnerIndex >= 0)
     {
         std::string winText;
-        if (gameMode == GameMode::Teams)
+        if (gameMode == GameMode::Teams || gameMode == GameMode::Battle)
             winText = "TEAM " + std::to_string (winnerIndex + 1) + " WINS!";
         else
             winText = "PLAYER " + std::to_string (winnerIndex + 1) + " WINS!";
@@ -902,7 +1005,7 @@ void Game::renderGameOver()
     }
 
     // Display win statistics
-    if (gameMode == GameMode::Teams)
+    if (gameMode == GameMode::Teams || gameMode == GameMode::Battle)
     {
         std::string statsText = "TEAM 1: " + std::to_string (teamWins[0]) +
                                 "  -  TEAM 2: " + std::to_string (teamWins[1]);
@@ -961,12 +1064,31 @@ Vec2 Game::getShipStartPosition (int index) const
         }
     }
 
+    if (gameMode == GameMode::Battle)
+    {
+        // 6v6 mode: 6 ships per team in a single column on each side
+        float margin = w * 0.12f;
+        int shipsPerTeam = 6;
+
+        int team = getTeam (index);
+        int row = (team == 0) ? index : index - shipsPerTeam;
+
+        float verticalSpacing = h / (shipsPerTeam + 1);
+        float y = verticalSpacing + row * verticalSpacing;
+
+        if (team == 0)
+            return { margin, y };
+        else
+            return { w - margin, y };
+    }
+
     // FFA mode: Place ships in a circle around the center
     Vec2 center = { w / 2.0f, h / 2.0f };
     float radius = std::min (w, h) * 0.35f;
 
     float angleOffset = -pi / 2.0f;
-    float angle = angleOffset + (index * 2.0f * pi / NUM_SHIPS);
+    int numShips = getNumShipsForMode();
+    float angle = angleOffset + (index * 2.0f * pi / numShips);
 
     return center + Vec2::fromAngle (angle) * radius;
 }
@@ -991,9 +1113,19 @@ float Game::getShipStartAngle (int index) const
             return pi;    // Team 1 faces left
     }
 
+    if (gameMode == GameMode::Battle)
+    {
+        // 6v6 mode: teams face each other
+        if (getTeam (index) == 0)
+            return 0.0f;  // Team 0 faces right
+        else
+            return pi;    // Team 1 faces left
+    }
+
     // FFA mode: Point ships 90 degrees from center (tangent to circle)
     float angleOffset = -pi / 2.0f;
-    float posAngle = angleOffset + (index * 2.0f * pi / NUM_SHIPS);
+    int numShips = getNumShipsForMode();
+    float posAngle = angleOffset + (index * 2.0f * pi / numShips);
     return posAngle + pi + (pi / 2.0f);
 }
 
@@ -1003,11 +1135,15 @@ void Game::getWindowSize (float& width, float& height) const
     height = (float) GetScreenHeight();
 }
 
-int Game::getTeam (int playerIndex) const
+int Game::getTeam (int shipIndex) const
 {
-    // Team 0: players 0, 1 (left side)
-    // Team 1: players 2, 3 (right side)
-    return playerIndex < 2 ? 0 : 1;
+    if (gameMode == GameMode::Battle)
+    {
+        // Battle mode: ships 0-5 on team 0, ships 6-11 on team 1
+        return shipIndex < 6 ? 0 : 1;
+    }
+    // Teams/other modes: ships 0, 1 on team 0, ships 2, 3 on team 1
+    return shipIndex < 2 ? 0 : 1;
 }
 
 bool Game::areEnemies (int playerA, int playerB) const
@@ -1023,10 +1159,10 @@ void Game::cycleGameMode (int direction)
     int mode = static_cast<int> (gameMode);
     mode += direction;
 
-    // Wrap around (3 modes: FFA, Teams, Duel)
+    // Wrap around (4 modes: FFA, Teams, Duel, Battle)
     if (mode < 0)
-        mode = 2;
-    else if (mode > 2)
+        mode = 3;
+    else if (mode > 3)
         mode = 0;
 
     gameMode = static_cast<GameMode> (mode);
@@ -1036,5 +1172,46 @@ int Game::getNumShipsForMode() const
 {
     if (gameMode == GameMode::Duel)
         return 2;
-    return NUM_SHIPS;  // 4 for FFA and Teams
+    if (gameMode == GameMode::Battle)
+        return 12;
+    return 4;  // FFA and Teams
+}
+
+int Game::getShipIndexForPlayer (int playerIndex) const
+{
+    if (gameMode == GameMode::Battle)
+    {
+        // In Battle mode:
+        // Player 0 -> Ship 0 (team 1)
+        // Player 1 -> Ship 1 (team 1)
+        // Player 2 -> Ship 6 (team 2)
+        // Player 3 -> Ship 7 (team 2)
+        if (playerIndex < 2)
+            return playerIndex;
+        else
+            return playerIndex + 4;  // 2->6, 3->7
+    }
+    // Other modes: direct mapping
+    return playerIndex;
+}
+
+int Game::getPlayerIndexForShip (int shipIndex) const
+{
+    if (gameMode == GameMode::Battle)
+    {
+        // In Battle mode, only ships 0, 1, 6, 7 can be human-controlled
+        if (shipIndex == 0)
+            return 0;
+        if (shipIndex == 1)
+            return 1;
+        if (shipIndex == 6)
+            return 2;
+        if (shipIndex == 7)
+            return 3;
+        return -1;  // AI controlled
+    }
+    // Other modes: direct mapping (if within player count)
+    if (shipIndex < MAX_PLAYERS)
+        return shipIndex;
+    return -1;
 }

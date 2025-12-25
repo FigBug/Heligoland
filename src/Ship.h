@@ -26,7 +26,7 @@ struct Smoke
 class Ship
 {
 public:
-    Ship (int playerIndex, Vec2 startPos, float startAngle, bool teamMode = false);
+    Ship (int playerIndex, Vec2 startPos, float startAngle, int team = -1);  // team: -1=FFA, 0=team1, 1=team2
 
     void update (float dt, Vec2 moveInput, Vec2 aimInput, bool fireInput, float arenaWidth, float arenaHeight, Vec2 wind);
 
@@ -48,7 +48,8 @@ public:
     // Health system
     float getHealth() const { return health; }
     float getMaxHealth() const { return maxHealth; }
-    bool isAlive() const { return health > 0 || isSinking(); }
+    bool isAlive() const { return health > 0; }
+    bool isVisible() const { return health > 0 || (sinking && ! isFullySunk()); }  // For rendering
     bool isSinking() const { return sinking; }
     bool isFullySunk() const { return sinking && sinkTimer >= Config::shipSinkDuration; }
     float getSinkProgress() const { return sinking ? sinkTimer / Config::shipSinkDuration : 0.0f; }
@@ -70,7 +71,7 @@ public:
 
 private:
     int playerIndex;
-    bool teamMode;
+    int team;  // -1=FFA, 0=team1, 1=team2
     Vec2 position;
     Vec2 velocity;
     float angle = 0.0f; // Ship facing direction (radians)

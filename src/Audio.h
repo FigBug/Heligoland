@@ -30,9 +30,9 @@ private:
     float randomGainVariation();
     float panFromScreenX (float screenX, float screenWidth);
 
-    Sound cannonSound = { 0 };
+    Sound cannonSounds[2] = { { 0 }, { 0 } };
     Sound splashSound = { 0 };
-    Sound explosionSound = { 0 };
+    Sound explosionSounds[2] = { { 0 }, { 0 } };
     Sound collisionSound = { 0 };
     Music engineSound = { 0 };
 

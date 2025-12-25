@@ -22,7 +22,8 @@ enum class GameMode
 {
     FFA,      // Free for all - every ship for themselves
     Teams,    // 2v2 - ships 0,1 vs ships 2,3
-    Duel      // 1v1 - ship 0 vs ship 1
+    Duel,     // 1v1 - ship 0 vs ship 1
+    Battle    // 6v6 - ships 0-5 vs ships 6-11, up to 2 humans per team
 };
 
 struct Explosion
@@ -50,7 +51,8 @@ public:
 private:
     static constexpr int WINDOW_WIDTH = 1280;
     static constexpr int WINDOW_HEIGHT = 720;
-    static constexpr int NUM_SHIPS = 4;
+    static constexpr int MAX_SHIPS = 12;      // Maximum ships (for Battle mode 6v6)
+    static constexpr int MAX_PLAYERS = 4;     // Maximum human players
 
     std::unique_ptr<Renderer> renderer;
     std::unique_ptr<Audio> audio;
@@ -64,9 +66,9 @@ private:
     float time = 0.0f; // Total elapsed time for animations
     double lastFrameTime = 0.0;
 
-    std::array<std::unique_ptr<Ship>, NUM_SHIPS> ships;
-    std::array<std::unique_ptr<Player>, NUM_SHIPS> players;
-    std::array<std::unique_ptr<AIController>, NUM_SHIPS> aiControllers;
+    std::array<std::unique_ptr<Ship>, MAX_SHIPS> ships;
+    std::array<std::unique_ptr<Player>, MAX_PLAYERS> players;
+    std::array<std::unique_ptr<AIController>, MAX_SHIPS> aiControllers;
     std::vector<Shell> shells;
     std::vector<Explosion> explosions;
 
@@ -76,8 +78,8 @@ private:
     float windChangeTimer = 0.0f;
 
     // Win tracking
-    std::array<int, NUM_SHIPS> playerWins = {}; // Wins per player in FFA mode
-    std::array<int, 2> teamWins = {};           // Wins per team in Teams mode
+    std::array<int, MAX_PLAYERS> playerWins = {}; // Wins per player in FFA mode
+    std::array<int, 2> teamWins = {};             // Wins per team in Teams/Battle mode
 
     void updateWind (float dt);
 
@@ -105,9 +107,11 @@ private:
 
     Vec2 getShipStartPosition (int index) const;
     float getShipStartAngle (int index) const;
-    int getTeam (int playerIndex) const;  // Returns 0 or 1 for team mode
-    bool areEnemies (int playerA, int playerB) const;
+    int getTeam (int shipIndex) const;  // Returns 0 or 1 for team mode
+    bool areEnemies (int shipA, int shipB) const;
     void getWindowSize (float& width, float& height) const;
     void cycleGameMode (int direction);
     int getNumShipsForMode() const;  // Returns number of ships for current game mode
+    int getShipIndexForPlayer (int playerIndex) const;  // Maps player slot to ship index
+    int getPlayerIndexForShip (int shipIndex) const;    // Maps ship index to player slot (-1 if AI)
 };

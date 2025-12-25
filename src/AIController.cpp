@@ -1,5 +1,6 @@
 #include "AIController.h"
 #include "Config.h"
+#include "Shell.h"
 #include "Ship.h"
 #include <algorithm>
 #include <cmath>
@@ -8,14 +9,20 @@
 AIController::AIController()
 {
     wanderTarget = { 0, 0 };
+
+    // Generate random personality factor between 0.95 and 1.05
+    static std::random_device rd;
+    static std::mt19937 gen (rd());
+    std::uniform_real_distribution<float> dist (0.95f, 1.05f);
+    personalityFactor = dist (gen);
 }
 
-void AIController::update (float dt, Ship& myShip, const std::vector<const Ship*>& enemies, float arenaWidth, float arenaHeight)
+void AIController::update (float dt, Ship& myShip, const std::vector<const Ship*>& enemies, const std::vector<Shell>& shells, float arenaWidth, float arenaHeight)
 {
     currentMode = determineMode (myShip, enemies);
     const Ship* target = findTarget (myShip, enemies);
 
-    updateMovement (dt, myShip, enemies, arenaWidth, arenaHeight);
+    updateMovement (dt, myShip, enemies, shells, arenaWidth, arenaHeight);
     updateAim (myShip, target);
 }
 
@@ -46,13 +53,29 @@ const Ship* AIController::findTarget (const Ship& myShip, const std::vector<cons
         return nullptr;
 
     Vec2 myPos = myShip.getPosition();
+    float firingRange = Config::maxCrosshairDistance * personalityFactor;
+
+    // Separate enemies into in-range and out-of-range
+    std::vector<const Ship*> inRange;
+    std::vector<const Ship*> outOfRange;
+    for (const Ship* enemy : enemies)
+    {
+        float dist = (enemy->getPosition() - myPos).length();
+        if (dist <= firingRange)
+            inRange.push_back (enemy);
+        else
+            outOfRange.push_back (enemy);
+    }
+
+    // Prefer in-range enemies, fall back to out-of-range if none
+    const std::vector<const Ship*>& candidates = inRange.empty() ? outOfRange : inRange;
 
     // In aggressive mode, target the weakest enemy
     if (currentMode == AIMode::Aggressive)
     {
         const Ship* weakest = nullptr;
         float lowestHealth = 999999.0f;
-        for (const Ship* enemy : enemies)
+        for (const Ship* enemy : candidates)
         {
             if (enemy->getHealth() < lowestHealth)
             {
@@ -66,7 +89,7 @@ const Ship* AIController::findTarget (const Ship& myShip, const std::vector<cons
     // Otherwise target the nearest enemy
     const Ship* nearest = nullptr;
     float nearestDist = 999999.0f;
-    for (const Ship* enemy : enemies)
+    for (const Ship* enemy : candidates)
     {
         float dist = (enemy->getPosition() - myPos).length();
         if (dist < nearestDist)
@@ -78,7 +101,7 @@ const Ship* AIController::findTarget (const Ship& myShip, const std::vector<cons
     return nearest;
 }
 
-void AIController::updateMovement (float dt, const Ship& myShip, const std::vector<const Ship*>& enemies, float arenaWidth, float arenaHeight)
+void AIController::updateMovement (float dt, const Ship& myShip, const std::vector<const Ship*>& enemies, const std::vector<Shell>& shells, float arenaWidth, float arenaHeight)
 {
     Vec2 myPos = myShip.getPosition();
     Vec2 vel = myShip.getVelocity();
@@ -99,6 +122,40 @@ void AIController::updateMovement (float dt, const Ship& myShip, const std::vect
         moveInput.x = (rand() % 2 == 0) ? 1.0f : -1.0f;
         wanderTarget = { arenaWidth / 2.0f, arenaHeight / 2.0f };
         wanderTimer = 2.0f;
+        return;
+    }
+
+    // TOP PRIORITY: Dodge incoming shells
+    float dodgeUrgency = 0.0f;
+    Vec2 dodgeDir = getDodgeDirection (myShip, shells, dodgeUrgency);
+
+    if (dodgeUrgency > 0.5f)
+    {
+        // Urgent dodge - override all other movement
+        Vec2 desiredDir = dodgeDir;
+        float desiredSpeed = 1.0f;  // Full speed dodge
+
+        avoidEdges (myShip, arenaWidth, arenaHeight, desiredDir);
+
+        if (desiredDir.lengthSquared() > 0.01f)
+        {
+            float targetAngle = desiredDir.toAngle();
+            float angleDiff = targetAngle - shipAngle;
+
+            while (angleDiff > pi)
+                angleDiff -= 2.0f * pi;
+            while (angleDiff < -pi)
+                angleDiff += 2.0f * pi;
+
+            moveInput.x = std::clamp (angleDiff * 2.0f, -1.0f, 1.0f);
+
+            if (std::abs (angleDiff) < pi * 0.5f)
+                moveInput.y = -desiredSpeed;
+            else if (std::abs (angleDiff) > pi * 0.75f)
+                moveInput.y = 0.3f;  // Reverse while turning
+            else
+                moveInput.y = 0.0f;
+        }
         return;
     }
 
@@ -146,7 +203,7 @@ void AIController::updateMovement (float dt, const Ship& myShip, const std::vect
             float dist = toTarget.length();
 
             // Get close but not too close (stay at half firing range)
-            float idealDist = Config::maxCrosshairDistance * 0.5f;
+            float idealDist = Config::maxCrosshairDistance * 0.5f * personalityFactor;
             if (dist > idealDist)
             {
                 desiredDir = toTarget.normalized();
@@ -163,34 +220,66 @@ void AIController::updateMovement (float dt, const Ship& myShip, const std::vect
     }
     else // Normal mode
     {
-        // Stay at edge of firing range from nearest enemy
-        const Ship* nearest = findTarget (myShip, enemies);
-        if (nearest)
+        // Cautious approach - stay at edge of firing range and get broadside
+        const Ship* target = findTarget (myShip, enemies);
+        if (target)
         {
-            Vec2 toEnemy = nearest->getPosition() - myPos;
+            Vec2 toEnemy = target->getPosition() - myPos;
             float dist = toEnemy.length();
+            float enemyAngle = target->getAngle();
 
-            // Ideal distance is just inside max firing range
-            float idealDist = Config::maxCrosshairDistance * 0.85f;
-            float tolerance = 30.0f;
+            // Calculate if we're in the enemy's firing arc (front 180 degrees)
+            Vec2 enemyForward = Vec2::fromAngle (enemyAngle);
+            Vec2 enemyToUs = (myPos - target->getPosition()).normalized();
+            float dotProduct = enemyForward.dot (enemyToUs);
+            bool inEnemyFiringArc = dotProduct > 0.0f;  // Enemy can see us
+
+            // Ideal distance - stay just inside our max range, but outside if enemy is aiming at us
+            float idealDist = Config::maxCrosshairDistance * 0.9f * personalityFactor;
+            if (inEnemyFiringArc && dist < Config::maxCrosshairDistance * personalityFactor)
+            {
+                // Enemy can shoot at us - prefer to stay further back
+                idealDist = Config::maxCrosshairDistance * 1.05f * personalityFactor;
+            }
+
+            float tolerance = 40.0f * personalityFactor;
+
+            // Calculate perpendicular direction for circling (to get broadside)
+            Vec2 perpendicular = { -toEnemy.y, toEnemy.x };
+
+            // Check which perpendicular direction gets us more broadside to enemy
+            // We want to be perpendicular to the enemy's facing direction
+            Vec2 enemySide = { -enemyForward.y, enemyForward.x };
+            if (perpendicular.dot (enemySide) < 0)
+                perpendicular = perpendicular * -1.0f;
+
+            // Start broadside approach at 1.2x firing range
+            float broadsideStartDist = Config::maxCrosshairDistance * 1.2f * personalityFactor;
 
             if (dist < idealDist - tolerance)
             {
-                // Too close - back away
-                desiredDir = toEnemy.normalized() * -1.0f;
-                desiredSpeed = 0.5f;
+                // Too close - back away while circling
+                Vec2 awayDir = toEnemy.normalized() * -1.0f;
+                desiredDir = (awayDir + perpendicular * 0.5f).normalized();
+                desiredSpeed = 0.6f;
+            }
+            else if (dist > broadsideStartDist)
+            {
+                // Far away - approach directly to close distance faster
+                desiredDir = toEnemy.normalized();
+                desiredSpeed = 0.6f;
             }
             else if (dist > idealDist + tolerance)
             {
-                // Too far - move closer
-                desiredDir = toEnemy.normalized();
+                // Within broadside range - approach at an angle to get broadside
+                Vec2 approachDir = toEnemy.normalized();
+                desiredDir = (approachDir + perpendicular * 0.8f).normalized();
                 desiredSpeed = 0.5f;
             }
             else
             {
-                // Good distance - circle around to get better angle
-                Vec2 perpendicular = { -toEnemy.y, toEnemy.x };
-                desiredDir = perpendicular.normalized();
+                // Good distance - circle to maintain broadside position
+                desiredDir = perpendicular;
                 desiredSpeed = 0.3f;
             }
         }
@@ -337,8 +426,8 @@ void AIController::updateAim (const Ship& myShip, const Ship* targetShip)
             }
 
             // Fire if crosshair is close to predicted position and in range
-            fireInput = crosshairDist < Config::aiCrosshairTolerance &&
-                        distance < Config::aiFireDistance &&
+            fireInput = crosshairDist < Config::aiCrosshairTolerance * personalityFactor &&
+                        distance < Config::aiFireDistance * personalityFactor &&
                         myShip.isReadyToFire();
         }
         else
@@ -352,4 +441,87 @@ void AIController::updateAim (const Ship& myShip, const Ship* targetShip)
         aimInput = { 0, 0 };
         fireInput = false;
     }
+}
+
+Vec2 AIController::getDodgeDirection (const Ship& myShip, const std::vector<Shell>& shells, float& urgency)
+{
+    Vec2 myPos = myShip.getPosition();
+    float shipRadius = myShip.getLength() / 2.0f;
+    int myIndex = myShip.getPlayerIndex();
+
+    Vec2 totalDodgeDir = { 0, 0 };
+    urgency = 0.0f;
+
+    for (const Shell& shell : shells)
+    {
+        if (! shell.isAlive() || shell.hasLanded())
+            continue;
+
+        // Ignore our own shells
+        if (shell.getOwnerIndex() == myIndex)
+            continue;
+
+        Vec2 shellPos = shell.getPosition();
+        Vec2 shellVel = shell.getVelocity();
+        float shellSpeed = shellVel.length();
+
+        if (shellSpeed < 1.0f)
+            continue;
+
+        Vec2 shellDir = shellVel.normalized();
+
+        // Vector from shell to ship
+        Vec2 toShip = myPos - shellPos;
+
+        // Project ship position onto shell's path
+        float projDist = toShip.dot (shellDir);
+
+        // Shell is behind us or already passed
+        if (projDist < 0)
+            continue;
+
+        // Closest point on shell's path to ship
+        Vec2 closestPoint = shellPos + shellDir * projDist;
+        Vec2 toClosest = myPos - closestPoint;
+        float perpDist = toClosest.length();
+
+        // Danger radius - how close is too close
+        float dangerRadius = (shipRadius + shell.getSplashRadius() + 30.0f) * personalityFactor;
+
+        if (perpDist < dangerRadius)
+        {
+            // Shell is heading toward us!
+            float timeToImpact = projDist / shellSpeed;
+
+            // Only worry about shells arriving soon
+            if (timeToImpact < 2.0f)
+            {
+                // Calculate urgency based on time and proximity
+                float timeUrgency = 1.0f - (timeToImpact / 2.0f);
+                float proxUrgency = 1.0f - (perpDist / dangerRadius);
+                float shellUrgency = std::max (timeUrgency, proxUrgency);
+
+                // Dodge perpendicular to shell path
+                Vec2 dodgeDir;
+                if (perpDist > 0.1f)
+                {
+                    dodgeDir = toClosest.normalized();
+                }
+                else
+                {
+                    // Shell is heading straight at us - pick a perpendicular direction
+                    dodgeDir = { -shellDir.y, shellDir.x };
+                }
+
+                // Weight by urgency
+                totalDodgeDir = totalDodgeDir + dodgeDir * shellUrgency;
+                urgency = std::max (urgency, shellUrgency);
+            }
+        }
+    }
+
+    if (totalDodgeDir.lengthSquared() > 0.01f)
+        return totalDodgeDir.normalized();
+
+    return { 0, 0 };
 }

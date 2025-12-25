@@ -3,8 +3,8 @@
 #include <algorithm>
 #include <cmath>
 
-Ship::Ship (int playerIndex_, Vec2 startPos, float startAngle, bool teamMode_)
-    : playerIndex (playerIndex_), teamMode (teamMode_), position (startPos), angle (startAngle), turrets { {
+Ship::Ship (int playerIndex_, Vec2 startPos, float startAngle, int team_)
+    : playerIndex (playerIndex_), team (team_), position (startPos), angle (startAngle), turrets { {
                                                                                                      Turret ({ length * 0.35f, 0.0f }, true), // Front
                                                                                                      Turret ({ length * 0.12f, 0.0f }, true), // Front-mid
                                                                                                      Turret ({ -length * 0.12f, 0.0f }, false), // Rear-mid
@@ -229,23 +229,13 @@ void Ship::clampToArena (float arenaWidth, float arenaHeight)
 
 Color Ship::getColor() const
 {
-    if (teamMode)
+    if (team >= 0)
     {
-        // Team 1 (players 0, 1): Red shades
-        // Team 2 (players 2, 3): Blue shades
-        switch (playerIndex)
-        {
-            case 0:
-                return Config::colorTeam1Dark;
-            case 1:
-                return Config::colorTeam1Light;
-            case 2:
-                return Config::colorTeam2Dark;
-            case 3:
-                return Config::colorTeam2Light;
-            default:
-                return Config::colorGrey;
-        }
+        // Team mode: alternate between dark and light shades
+        if (team == 0)
+            return (playerIndex % 2 == 0) ? Config::colorTeam1Dark : Config::colorTeam1Light;
+        else
+            return (playerIndex % 2 == 0) ? Config::colorTeam2Dark : Config::colorTeam2Light;
     }
     else
     {
