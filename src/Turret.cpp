@@ -84,6 +84,7 @@ void Turret::update (float dt, float shipAngle, Vec2 targetDir)
         while (relativeAngle < -pi)
             relativeAngle += 2.0f * pi;
 
+        desiredAngle = relativeAngle;
         targetAngle = clampAngleToArc (relativeAngle);
     }
 
@@ -187,6 +188,19 @@ void Turret::setTargetAngle (float angle_)
 
 bool Turret::isAimedAtTarget() const
 {
+    // Check if desired angle is actually reachable (not clamped)
+    float clampedDesired = clampAngleToArc (desiredAngle);
+    float desiredDiff = clampedDesired - desiredAngle;
+    while (desiredDiff > pi)
+        desiredDiff -= 2.0f * pi;
+    while (desiredDiff < -pi)
+        desiredDiff += 2.0f * pi;
+
+    // If desired angle was clamped, target is not reachable
+    if (std::abs (desiredDiff) > 0.01f)
+        return false;
+
+    // Check if turret is aimed at the target
     float angleDiff = targetAngle - angle;
     // Normalize to [-PI, PI]
     while (angleDiff > pi)

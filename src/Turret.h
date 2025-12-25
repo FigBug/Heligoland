@@ -22,7 +22,8 @@ public:
 private:
     Vec2 localOffset; // Position relative to ship center
     float angle = 0.0f; // Current turret rotation relative to ship (radians)
-    float targetAngle = 0.0f;
+    float targetAngle = 0.0f; // Clamped to arc
+    float desiredAngle = 0.0f; // Original unclamped desired angle
     float rotationSpeed = Config::turretRotationSpeed;
     float radius = Config::turretRadius;
     float barrelLength = Config::turretBarrelLength;

@@ -14,13 +14,9 @@ Renderer::Renderer()
 Renderer::~Renderer()
 {
     if (noiseTexture1.id != 0)
-    {
         UnloadTexture (noiseTexture1);
-    }
     if (noiseTexture2.id != 0)
-    {
         UnloadTexture (noiseTexture2);
-    }
 }
 
 void Renderer::clear()
@@ -88,17 +84,13 @@ void Renderer::drawShip (const Ship& ship)
     Color color = ship.getColor();
 
     // Draw firing range circle (very faint white) - only for non-sinking ships
-    if (! ship.isSinking())
-    {
+    if (ship.isAlive())
         drawFilledCircle (pos, Config::maxCrosshairDistance, Config::colorFiringRange);
-    }
 
     // Calculate alpha for sinking ships
     float alpha = 1.0f;
     if (ship.isSinking())
-    {
         alpha = 1.0f - ship.getSinkProgress();
-    }
 
     // Apply alpha to ship color
     color.a = (unsigned char) (255 * alpha);
