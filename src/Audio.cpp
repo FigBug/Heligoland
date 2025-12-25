@@ -161,7 +161,7 @@ void Audio::update (float dt)
             currentEngineVolume = engineVolume;
     }
 
-    SetMusicVolume (engineSound, currentEngineVolume * 0.3f); // Engine is quieter
+    SetMusicVolume (engineSound, currentEngineVolume * 0.3f * masterVolume); // Engine is quieter
     UpdateMusicStream (engineSound);
 }
 
@@ -209,10 +209,16 @@ void Audio::setEngineVolume (float volume)
     engineVolume = std::max (0.0f, std::min (1.0f, volume));
 }
 
+void Audio::setMasterVolume (int level)
+{
+    masterVolumeLevel = std::max (0, std::min (10, level));
+    masterVolume = masterVolumeLevel / 10.0f;
+}
+
 void Audio::playWithVariation (Sound& sound, float screenX, float screenWidth)
 {
     float pitch = randomPitchVariation();
-    float gain = randomGainVariation();
+    float gain = randomGainVariation() * masterVolume;
     float pan = panFromScreenX (screenX, screenWidth);
 
     SetSoundPitch (sound, pitch);

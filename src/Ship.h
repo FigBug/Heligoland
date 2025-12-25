@@ -30,39 +30,40 @@ public:
 
     void update (float dt, Vec2 moveInput, Vec2 aimInput, bool fireInput, float arenaWidth, float arenaHeight, Vec2 wind);
 
-    Vec2 getPosition() const { return position; }
-    float getAngle() const { return angle; }
-    float getLength() const { return length; }
-    float getWidth() const { return width; }
-    float getMaxSpeed() const { return maxSpeed; }
-    int getPlayerIndex() const { return playerIndex; }
+    Vec2 getPosition() const                        { return position; }
+    float getAngle() const                          { return angle; }
+    float getLength() const                         { return length; }
+    float getWidth() const                          { return width; }
+    float getMaxSpeed() const                       { return maxSpeed; }
+    int getPlayerIndex() const                      { return playerIndex; }
     const std::array<Turret, 4>& getTurrets() const { return turrets; }
-    Vec2 getCrosshairPosition() const { return position + crosshairOffset; }
+    Vec2 getCrosshairPosition() const               { return position + crosshairOffset; }
     void setCrosshairPosition (Vec2 worldPos);  // For mouse aiming
-    const std::vector<Bubble>& getBubbles() const { return bubbles; }
-    const std::vector<Smoke>& getSmoke() const { return smoke; }
-    float getDamagePercent() const { return 1.0f - (health / maxHealth); }
-    std::vector<Shell>& getPendingShells() { return pendingShells; }
+    const std::vector<Bubble>& getBubbles() const   { return bubbles; }
+    const std::vector<Smoke>& getSmoke() const      { return smoke; }
+    float getDamagePercent() const                  { return 1.0f - (health / maxHealth); }
+    std::vector<Shell>& getPendingShells()          { return pendingShells; }
     Color getColor() const;
 
     // Health system
-    float getHealth() const { return health; }
-    float getMaxHealth() const { return maxHealth; }
-    bool isAlive() const { return health > 0 || isSinking(); }
-    bool isSinking() const { return sinking; }
-    bool isFullySunk() const { return sinking && sinkTimer >= Config::shipSinkDuration; }
-    float getSinkProgress() const { return sinking ? sinkTimer / Config::shipSinkDuration : 0.0f; }
+    float getHealth() const         { return health; }
+    float getMaxHealth() const      { return maxHealth; }
+    bool isAlive() const            { return health > 0; }
+    bool isVisible() const          { return isAlive() || isSinking(); }
+    bool isSinking() const          { return sinking; }
+    bool isFullySunk() const        { return sinking && sinkTimer >= Config::shipSinkDuration; }
+    float getSinkProgress() const   { return sinking ? sinkTimer / Config::shipSinkDuration : 0.0f; }
     void takeDamage (float damage);
 
     // Collision
-    Vec2 getVelocity() const { return velocity; }
-    float getSpeed() const { return velocity.length(); }
+    Vec2 getVelocity() const        { return velocity; }
+    float getSpeed() const          { return velocity.length(); }
     void applyCollision (Vec2 pushDirection, float pushDistance, Vec2 myVel, Vec2 otherVel);
     std::array<Vec2, 4> getCorners() const; // Get 4 corners for OBB collision
 
     // HUD info
-    float getThrottle() const { return throttle; }
-    float getRudder() const { return rudder; }
+    float getThrottle() const       { return throttle; }
+    float getRudder() const         { return rudder; }
     float getCrosshairDistance() const; // Distance from ship to crosshair
     float getReloadProgress() const { return 1.0f - (fireTimer / Config::fireInterval); }
     bool isReadyToFire() const; // True if reloaded AND turrets on target AND in range

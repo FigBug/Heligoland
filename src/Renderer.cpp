@@ -307,21 +307,27 @@ void Renderer::drawShipHUD (const Ship& ship, int slot, int totalSlots, float sc
 
     // Player label
     std::string label = "P" + std::to_string (ship.getPlayerIndex() + 1);
-    drawText (label, { x + 5, y + 5 }, 2.0f, shipColor);
+    drawText (label, { x + 5, y + 3 }, 2.0f, shipColor);
+
+    // Speed in knots
+    float speedKnots = (ship.getSpeed() / Config::shipMaxSpeed) * Config::shipFullSpeedKnots;
+    std::string speedText = std::to_string ((int) std::round (speedKnots)) + "KT";
+    Color speedColor = { Config::colorGreyLight.r, Config::colorGreyLight.g, Config::colorGreyLight.b, a };
+    drawText (speedText, { x + 5, y + 20 }, 1.0f, speedColor);
 
     float barX = x + 35;
     float barWidth = hudWidth - 45;
     float barHeight = 8.0f;
 
     // Health bar
-    float healthY = y + 6;
+    float healthY = y + 5;
     drawFilledRect ({ barX, healthY }, barWidth, barHeight, barBg);
     float healthPct = ship.getHealth() / ship.getMaxHealth();
     Color healthColor = { (unsigned char) (255 * (1 - healthPct)), (unsigned char) (255 * healthPct), 0, a };
     drawFilledRect ({ barX, healthY }, barWidth * healthPct, barHeight, healthColor);
 
     // Throttle bar (centered, negative goes left, positive goes right)
-    float throttleY = y + 17;
+    float throttleY = y + 20;
     drawFilledRect ({ barX, throttleY }, barWidth, barHeight, barBg);
     float throttle = ship.getThrottle();
     float throttleCenter = barX + barWidth / 2.0f;
@@ -339,7 +345,7 @@ void Renderer::drawShipHUD (const Ship& ship, int slot, int totalSlots, float sc
     drawLine ({ throttleCenter, throttleY }, { throttleCenter, throttleY + barHeight }, white);
 
     // Rudder bar (centered, negative goes left, positive goes right)
-    float rudderY = y + 28;
+    float rudderY = y + 35;
     drawFilledRect ({ barX, rudderY }, barWidth, barHeight, barBg);
     float rudder = ship.getRudder();
     float rudderCenter = barX + barWidth / 2.0f;

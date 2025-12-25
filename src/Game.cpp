@@ -141,6 +141,40 @@ void Game::updateTitle (float dt)
     leftWasPressed = leftPressed;
     rightWasPressed = rightPressed;
 
+    // Volume control with triggers (up/down keys or gamepad triggers)
+    if (audio)
+    {
+        static bool volumeDownWasPressed = false;
+        static bool volumeUpWasPressed = false;
+
+        bool volumeDownPressed = IsKeyDown (KEY_DOWN);
+        bool volumeUpPressed = IsKeyDown (KEY_UP);
+
+        // Check all gamepads for trigger presses
+        for (int i = 0; i < 4; ++i)
+        {
+            if (IsGamepadAvailable (i))
+            {
+                float leftTrigger = GetGamepadAxisMovement (i, GAMEPAD_AXIS_LEFT_TRIGGER);
+                float rightTrigger = GetGamepadAxisMovement (i, GAMEPAD_AXIS_RIGHT_TRIGGER);
+
+                if (leftTrigger > 0.5f)
+                    volumeDownPressed = true;
+                if (rightTrigger > 0.5f)
+                    volumeUpPressed = true;
+            }
+        }
+
+        // Adjust volume on press (with edge detection)
+        if (volumeDownPressed && ! volumeDownWasPressed)
+            audio->setMasterVolume (audio->getMasterVolumeLevel() - 1);
+        if (volumeUpPressed && ! volumeUpWasPressed)
+            audio->setMasterVolume (audio->getMasterVolumeLevel() + 1);
+
+        volumeDownWasPressed = volumeDownPressed;
+        volumeUpWasPressed = volumeUpPressed;
+    }
+
     // Check if any button or click is pressed to start the game
     if (anyButtonPressed())
     {
@@ -241,10 +275,8 @@ void Game::updatePlaying (float dt)
     int numShips = getNumShipsForMode();
     for (int shipIdx = 0; shipIdx < numShips; ++shipIdx)
     {
-        if (! ships[shipIdx] || ! ships[shipIdx]->isAlive())
-        {
+        if (! ships[shipIdx] || ! ships[shipIdx]->isVisible())
             continue; // Skip dead ships
-        }
 
         Vec2 moveInput, aimInput;
         bool fireInput = false;
@@ -265,12 +297,8 @@ void Game::updatePlaying (float dt)
             // Find all living enemy ships for AI
             std::vector<const Ship*> enemies;
             for (int j = 0; j < numShips; ++j)
-            {
-                if (areEnemies (shipIdx, j) && ships[j] && ships[j]->isAlive() && ! ships[j]->isSinking())
-                {
+                if (areEnemies (shipIdx, j) && ships[j] && ships[j]->isAlive())
                     enemies.push_back (ships[j].get());
-                }
-            }
 
             aiControllers[shipIdx]->update (dt, *ships[shipIdx], enemies, shells, arenaWidth, arenaHeight);
             moveInput = aiControllers[shipIdx]->getMoveInput();
@@ -282,9 +310,7 @@ void Game::updatePlaying (float dt)
 
         // Set crosshair directly for mouse aiming
         if (isHumanControlled && players[playerIdx]->isUsingMouse())
-        {
             ships[shipIdx]->setCrosshairPosition (players[playerIdx]->getMousePosition());
-        }
 
         // Collect pending shells from ship
         auto& pendingShells = ships[shipIdx]->getPendingShells();
@@ -293,10 +319,10 @@ void Game::updatePlaying (float dt)
             // Play cannon sound at ship position
             audio->playCannon (ships[shipIdx]->getPosition().x, arenaWidth);
         }
+
         for (auto& shell : pendingShells)
-        {
             shells.push_back (std::move (shell));
-        }
+
         pendingShells.clear();
     }
 
@@ -345,12 +371,8 @@ void Game::updateGameOver (float dt)
     // Keep updating ships (for smoke effects)
     int numShips = getNumShipsForMode();
     for (int i = 0; i < numShips; ++i)
-    {
-        if (ships[i] && ships[i]->isAlive())
-        {
+        if (ships[i] && ships[i]->isVisible())
             ships[i]->update (dt, { 0, 0 }, { 0, 0 }, false, arenaWidth, arenaHeight, wind);
-        }
-    }
 
     // Keep updating shells so they land and disappear
     updateShells (dt);
@@ -427,7 +449,7 @@ void Game::checkCollisions()
 
         for (auto& ship : ships)
         {
-            if (! ship || ! ship->isAlive())
+            if (! ship || ! ship->isVisible())
                 continue;
             if (ship->getPlayerIndex() == shell.getOwnerIndex())
                 continue; // Don't hit own ship
@@ -452,9 +474,7 @@ void Game::checkCollisions()
 
                 // Play explosion sound
                 if (audio)
-                {
                     audio->playExplosion (shell.getPosition().x, arenaWidth);
-                }
 
                 // Check if ship was sunk
                 if (! ship->isAlive())
@@ -499,12 +519,12 @@ void Game::checkCollisions()
     int numShips = getNumShipsForMode();
     for (int i = 0; i < numShips; ++i)
     {
-        if (! ships[i] || ! ships[i]->isAlive())
+        if (! ships[i] || ! ships[i]->isVisible())
             continue;
 
         for (int j = i + 1; j < numShips; ++j)
         {
-            if (! ships[j] || ! ships[j]->isAlive())
+            if (! ships[j] || ! ships[j]->isVisible())
                 continue;
 
             // Get corners of both ships
@@ -573,7 +593,7 @@ void Game::checkCollisions()
                 float impactSpeed = relVel.length();
 
                 // Damage proportional to impact speed
-                float damage = impactSpeed;
+                float damage = impactSpeed * Config::collisionDamageScale;
                 ships[i]->takeDamage (damage);
                 ships[j]->takeDamage (damage);
 
@@ -589,9 +609,8 @@ void Game::checkCollisions()
                 // Determine collision normal (from i to j)
                 Vec2 diff = ships[j]->getPosition() - ships[i]->getPosition();
                 if (diff.dot (minAxis) < 0)
-                {
                     minAxis = minAxis * -1.0f;
-                }
+
                 Vec2 collisionNormal = minAxis;
 
                 // Push ships apart first
@@ -836,8 +855,16 @@ void Game::renderTitle()
         }
     }
 
+    // Draw volume control
+    if (audio)
+    {
+        std::string volumeText = "VOLUME: " + std::to_string (audio->getMasterVolumeLevel());
+        renderer->drawTextCentered (volumeText, { w / 2.0f, h * 0.82f }, 2.5f, Config::colorSubtitle);
+        renderer->drawTextCentered ("UP - DOWN TO CHANGE VOLUME", { w / 2.0f, h * 0.87f }, 1.5f, Config::colorGreySubtle);
+    }
+
     // Draw start instruction
-    renderer->drawTextCentered ("CLICK OR PRESS ANY BUTTON TO START", { w / 2.0f, h * 0.90f }, 2.0f, Config::colorInstruction);
+    renderer->drawTextCentered ("CLICK OR PRESS ANY BUTTON TO START", { w / 2.0f, h * 0.94f }, 2.0f, Config::colorInstruction);
 }
 
 void Game::renderPlaying()
@@ -847,51 +874,31 @@ void Game::renderPlaying()
 
     // Draw bubble trails first (behind everything)
     for (const auto& ship : ships)
-    {
-        if (ship && ship->isAlive())
-        {
+        if (ship && ship->isVisible())
             renderer->drawBubbleTrail (*ship);
-        }
-    }
 
     // Draw ships
     for (const auto& ship : ships)
-    {
-        if (ship && ship->isAlive())
-        {
+        if (ship && ship->isVisible())
             renderer->drawShip (*ship);
-        }
-    }
 
     // Draw smoke (above ships)
     for (const auto& ship : ships)
-    {
-        if (ship && ship->isAlive())
-        {
+        if (ship && ship->isVisible())
             renderer->drawSmoke (*ship);
-        }
-    }
 
     // Draw shells (on top of ships)
     for (const auto& shell : shells)
-    {
         renderer->drawShell (shell);
-    }
 
     // Draw explosions
     for (const auto& explosion : explosions)
-    {
         renderer->drawExplosion (explosion);
-    }
 
     // Draw crosshairs (on top of everything)
     for (const auto& ship : ships)
-    {
-        if (ship && ship->isAlive() && ! ship->isSinking())
-        {
+        if (ship && ship->isAlive())
             renderer->drawCrosshair (*ship);
-        }
-    }
 
     // Draw HUD for ships (in Battle mode, only show human-controlled ships)
     int numShips = getNumShipsForMode();
@@ -979,9 +986,7 @@ void Game::renderGameOver()
 {
     // Wait before showing text so player can see the final explosion
     if (gameOverTimer < Config::gameOverTextDelay)
-    {
         return;
-    }
 
     float w, h;
     getWindowSize (w, h);

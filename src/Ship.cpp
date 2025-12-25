@@ -40,9 +40,7 @@ void Ship::update (float dt, Vec2 moveInput, Vec2 aimInput, bool fireInput, floa
 
     // Update fire timer
     if (fireTimer > 0)
-    {
         fireTimer -= dt;
-    }
 
     // Fire if requested and ready
     if (fireInput && fireTimer <= 0)
@@ -92,16 +90,31 @@ void Ship::update (float dt, Vec2 moveInput, Vec2 aimInput, bool fireInput, floa
     // Calculate current speed with sign (positive = forward, negative = backward)
     float currentSpeed = velocity.dot (forward);
 
+    // Acceleration/deceleration rate based on shipAccelTime
+    float accelRate = maxSpeed / Config::shipAccelTime;
+    float coastDecelRate = maxSpeed / Config::shipCoastStopTime;
+
     // Gradually adjust speed toward target
-    if (throttle != 0)
+    float speedDiff = targetSpeed - currentSpeed;
+    if (std::abs (throttle) > 0.01f && std::abs (speedDiff) > 0.01f)
     {
-        float newSpeed = currentSpeed + (targetSpeed - currentSpeed) * 0.5f * dt;
-        velocity = forward * newSpeed;
+        // Throttle applied - use full accel/decel rate
+        float change = accelRate * dt;
+        if (speedDiff > 0)
+            currentSpeed = std::min (currentSpeed + change, targetSpeed);
+        else
+            currentSpeed = std::max (currentSpeed - change, targetSpeed);
+        velocity = forward * currentSpeed;
     }
-    else
+    else if (std::abs (throttle) <= 0.01f && std::abs (currentSpeed) > 0.01f)
     {
-        // Coast - apply drag
-        velocity *= Config::shipDragCoefficient;
+        // Coasting - slow deceleration to stop
+        float change = coastDecelRate * dt;
+        if (currentSpeed > 0)
+            currentSpeed = std::max (0.0f, currentSpeed - change);
+        else
+            currentSpeed = std::min (0.0f, currentSpeed + change);
+        velocity = forward * currentSpeed;
     }
 
     // Apply rudder to turning (only when moving, reduced by damage)
@@ -135,9 +148,7 @@ void Ship::update (float dt, Vec2 moveInput, Vec2 aimInput, bool fireInput, floa
 
     // Update crosshair offset based on aim stick (moves in X/Y)
     if (aimInput.lengthSquared() > 0.01f)
-    {
         crosshairOffset += aimInput * Config::crosshairSpeed * dt;
-    }
 
     // Clamp crosshair to stay on screen
     Vec2 crosshairWorldPos = position + crosshairOffset;
@@ -154,9 +165,7 @@ void Ship::update (float dt, Vec2 moveInput, Vec2 aimInput, bool fireInput, floa
     // Clamp crosshair to max range
     float crosshairDist = crosshairOffset.length();
     if (crosshairDist > Config::maxCrosshairDistance)
-    {
         crosshairOffset = crosshairOffset.normalized() * Config::maxCrosshairDistance;
-    }
 
     // Update turrets to aim at crosshair from their individual positions
     crosshairWorldPos = position + crosshairOffset;
@@ -375,24 +384,16 @@ bool Ship::isReadyToFire() const
 {
     // Check if reloaded
     if (fireTimer > 0)
-    {
         return false;
-    }
 
     // Check if crosshair is in valid range
     if (! isCrosshairInRange())
-    {
         return false;
-    }
 
     // Check if all turrets are on target
     for (const auto& turret : turrets)
-    {
         if (! turret.isOnTarget())
-        {
             return false;
-        }
-    }
 
     return true;
 }
@@ -407,13 +408,9 @@ void Ship::updateBubbles (float dt)
     {
         it->alpha -= fadeRate * dt;
         if (it->alpha <= 0.0f)
-        {
             it = bubbles.erase (it);
-        }
         else
-        {
             ++it;
-        }
     }
 
     // Spawn new bubbles at the rear of the ship when moving
@@ -464,13 +461,9 @@ void Ship::updateSmoke (float dt, Vec2 wind)
         it->position += dispersedWind * Config::smokeWindStrength * dt;
 
         if (it->alpha <= 0.0f)
-        {
             it = smoke.erase (it);
-        }
         else
-        {
             ++it;
-        }
     }
 
     // Spawn new smoke - all ships make some engine smoke, damaged ships make more

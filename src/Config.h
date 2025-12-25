@@ -15,6 +15,9 @@ namespace Config
     static constexpr float shipLength                  = 50.0f;
     static constexpr float shipWidth                   = 15.0f;
     static constexpr float shipMaxSpeed                = 7.0f;
+    static constexpr float shipFullSpeedKnots          = 20.0f;     // Display speed at max velocity
+    static constexpr float shipAccelTime               = 20.0f;     // Seconds to reach full speed or stop from full speed with throttle
+    static constexpr float shipCoastStopTime           = 30.0f;     // Seconds to stop when coasting (no throttle)
     static constexpr float shipThrottleRate            = 0.5f;      // How fast throttle changes per second
     static constexpr float shipRudderRate              = 2.0f;      // How fast rudder moves
     static constexpr float shipRudderReturn            = 3.0f;      // How fast rudder returns to center
@@ -101,6 +104,7 @@ namespace Config
     // -------------------------------------------------------------------------
     static constexpr float collisionRestitution        = 0.5f;      // Bounciness (0 = inelastic, 1 = elastic)
     static constexpr float collisionAngularFactor      = 0.01f;     // How much collisions affect rotation
+    static constexpr float collisionDamageScale        = 35.7f;     // Two full-speed ships colliding = 5 shell impacts
     static constexpr float wallBounceMultiplier        = 0.3f;      // Velocity retained after hitting wall
 
     // -------------------------------------------------------------------------
