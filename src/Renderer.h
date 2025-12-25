@@ -24,7 +24,7 @@ public:
     void drawShell (const Shell& shell);
     void drawExplosion (const Explosion& explosion);
     void drawCrosshair (const Ship& ship);
-    void drawShipHUD (const Ship& ship, int slot, int totalSlots, float screenWidth, float alpha = 1.0f);
+    void drawShipHUD (const Ship& ship, int slot, int totalSlots, float screenWidth, float hudWidth, float alpha = 1.0f);
     void drawWindIndicator (Vec2 wind, float screenWidth, float screenHeight);
 
     void drawOval (Vec2 center, float width, float height, float angle, Color color);

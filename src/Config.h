@@ -37,7 +37,7 @@ namespace Config
     // -------------------------------------------------------------------------
     // Turrets
     // -------------------------------------------------------------------------
-    static constexpr float turretRotationSpeed         = 1.0f;      // Radians per second
+    static constexpr float turretRotationSpeed         = 0.5f;      // Radians per second
     static constexpr float turretRadius                = 5.0f;
     static constexpr float turretBarrelLength          = 8.0f;
     static constexpr float turretArcSize               = 0.75f;     // Arc = PI * this (0.75 = 135 degrees)
@@ -49,7 +49,7 @@ namespace Config
     static constexpr float fireInterval                = 15.0f;     // Seconds between shots
     static constexpr float shellSpeedMultiplier        = 5.0f;      // Shell speed = ship max speed * this
     static constexpr float shellRadius                 = 2.0f;
-    static constexpr float shellSplashRadius           = 8.0f;      // Hit detection radius when shell lands
+    static constexpr float shellSplashRadius           = 4.0f;      // Hit detection radius when shell lands
     static constexpr float minShellRange               = 50.0f;     // Minimum range shells can travel
 
     // -------------------------------------------------------------------------
@@ -62,7 +62,7 @@ namespace Config
     // -------------------------------------------------------------------------
     // Bubbles (Wake Trail)
     // -------------------------------------------------------------------------
-    static constexpr float bubbleMinSpeed              = 5.0f;      // Min ship speed to spawn bubbles
+    static constexpr float bubbleMinSpeed              = 0.5f;      // Min ship speed to spawn bubbles
     static constexpr float bubbleSpawnInterval         = 0.02f;
     static constexpr float bubbleFadeTime              = 10.0f;     // Seconds to fade out
     static constexpr float bubbleMinRadius             = 1.5f;
@@ -72,12 +72,12 @@ namespace Config
     // Smoke
     // -------------------------------------------------------------------------
     static constexpr float smokeFadeTime               = 10.0f;     // Seconds to fade out
-    static constexpr float smokeWindStrength           = 15.0f;     // How much wind affects smoke
+    static constexpr float smokeWindStrength           = 30.0f;     // How much wind affects smoke
     static constexpr float smokeBaseSpawnInterval      = 0.0433f;   // ~30 per second when undamaged
     static constexpr float smokeDamageMultiplier       = 4.0f;      // Spawn rate increases with damage
     static constexpr float smokeBaseRadius             = 1.5f;
     static constexpr float smokeBaseAlpha              = 0.4f;
-    static constexpr float smokeWindAngleVariation     = 0.155f;    // +/- radians (~6 degrees)
+    static constexpr float smokeWindAngleVariation     = 0.2f;    // +/- radians (~6 degrees)
     static constexpr unsigned char smokeGreyStart      = 80;        // Grey value when not sinking
     static constexpr unsigned char smokeGreyEnd        = 140;       // Grey value when fully sunk
 
@@ -94,7 +94,7 @@ namespace Config
     // -------------------------------------------------------------------------
     static constexpr float windChangeInterval          = 60.0f;     // Seconds between wind target changes
     static constexpr float windLerpSpeed               = 0.05f;     // How fast wind changes
-    static constexpr float windMaxDrift                = 0.01f;     // Max shell drift (1%)
+    static constexpr float windMaxDrift                = 0.02f;     // Max shell drift (1%)
     static constexpr float windMinStrength             = 0.25f;     // Minimum wind strength
     static constexpr float windAngleChangeMax          = 0.524f;    // Max angle change (~30 degrees)
     static constexpr float windStrengthChangeMax       = 0.4f;      // Max strength change

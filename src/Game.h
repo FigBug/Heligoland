@@ -23,6 +23,7 @@ enum class GameMode
     FFA,      // Free for all - every ship for themselves
     Teams,    // 2v2 - ships 0,1 vs ships 2,3
     Duel,     // 1v1 - ship 0 vs ship 1
+    Triple,   // 1v1v1 - 3 ships
     Battle    // 6v6 - ships 0-5 vs ships 6-11, up to 2 humans per team
 };
 

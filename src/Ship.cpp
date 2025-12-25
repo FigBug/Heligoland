@@ -413,13 +413,14 @@ void Ship::updateBubbles (float dt)
             ++it;
     }
 
-    // Spawn new bubbles at the rear of the ship when moving
-    if (speed > Config::bubbleMinSpeed)
+    // Spawn new bubbles at the rear of the ship when moving or throttle applied
+    if (speed > Config::bubbleMinSpeed || std::abs (throttle) > 0.1f)
     {
         bubbleSpawnTimer += dt;
 
-        // Spawn rate increases with speed
-        float spawnRate = Config::bubbleSpawnInterval * (50.0f / speed);
+        // Spawn rate increases with speed (use minimum speed if just starting)
+        float effectiveSpeed = std::max (speed, 1.0f);
+        float spawnRate = Config::bubbleSpawnInterval * (50.0f / effectiveSpeed);
 
         while (bubbleSpawnTimer >= spawnRate)
         {

@@ -276,13 +276,11 @@ void Renderer::drawCrosshair (const Ship& ship)
     }
 }
 
-void Renderer::drawShipHUD (const Ship& ship, int slot, int totalSlots, float screenWidth, float alpha)
+void Renderer::drawShipHUD (const Ship& ship, int slot, int totalSlots, float screenWidth, float hudWidth, float alpha)
 {
-    float hudWidth = 200.0f;
     float hudHeight = 50.0f;
-    float spacing = 20.0f;
-    float totalWidth = totalSlots * hudWidth + (totalSlots - 1) * spacing;
-    float startX = (screenWidth - totalWidth) / 2.0f;
+    float spacing = 10.0f;
+    float startX = 10.0f; // Left aligned
     float x = startX + slot * (hudWidth + spacing);
     float y = 10.0f;
 
@@ -298,17 +296,21 @@ void Renderer::drawShipHUD (const Ship& ship, int slot, int totalSlots, float sc
     drawRect ({ x, y }, hudWidth, hudHeight, shipColor);
 
     // Player label
-    std::string label = "P" + std::to_string (ship.getPlayerIndex() + 1);
-    drawText (label, { x + 5, y + 3 }, 2.0f, shipColor);
+    int playerNum = ship.getPlayerIndex() + 1;
+    std::string label = std::to_string (playerNum);
+    float labelScale = hudWidth < 120.0f ? 1.5f : 2.0f;
+    drawText (label, { x + 3, y + 3 }, labelScale, shipColor);
 
     // Speed in knots
     float speedKnots = (ship.getSpeed() / Config::shipMaxSpeed) * Config::shipFullSpeedKnots;
     std::string speedText = std::to_string ((int) std::round (speedKnots)) + "KT";
     Color speedColor = { Config::colorGreyLight.r, Config::colorGreyLight.g, Config::colorGreyLight.b, a };
-    drawText (speedText, { x + 5, y + 20 }, 1.0f, speedColor);
+    drawText (speedText, { x + 3, y + 20 }, 1.0f, speedColor);
 
-    float barX = x + 35;
-    float barWidth = hudWidth - 45;
+    // Bars start after label area - scale with HUD width
+    float labelWidth = hudWidth < 120.0f ? 28.0f : 35.0f;
+    float barX = x + labelWidth;
+    float barWidth = hudWidth - labelWidth - 5.0f;
     float barHeight = 8.0f;
 
     // Health bar

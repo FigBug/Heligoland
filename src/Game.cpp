@@ -752,6 +752,8 @@ void Game::renderTitle()
         modeText = "2 VS 2";
     else if (gameMode == GameMode::Duel)
         modeText = "1 VS 1";
+    else if (gameMode == GameMode::Triple)
+        modeText = "1 VS 1 VS 1";
     else
         modeText = "BATTLE 6 VS 6";
     renderer->drawTextCentered (modeText, { w / 2.0f, h * 0.55f }, 4.0f, Config::colorModeText);
@@ -900,45 +902,37 @@ void Game::renderPlaying()
         if (ship && ship->isAlive())
             renderer->drawCrosshair (*ship);
 
-    // Draw HUD for ships (in Battle mode, only show human-controlled ships)
+    // Draw HUD for all ships
     int numShips = getNumShipsForMode();
-    std::vector<int> hudShipIndices;
 
-    if (gameMode == GameMode::Battle)
-    {
-        // Only show HUDs for potential human ships: 0, 1, 6, 7
-        hudShipIndices = { 0, 1, 6, 7 };
-    }
-    else
-    {
-        for (int i = 0; i < numShips; ++i)
-            hudShipIndices.push_back (i);
-    }
+    // Calculate HUD width based on available space (reserve 80px for wind indicator on right)
+    float availableWidth = w - 80.0f - 20.0f; // Right margin for wind, left margin
+    float hudSpacing = 10.0f;
+    float maxHudWidth = 200.0f;
+    float minHudWidth = 80.0f;
+    float hudWidth = std::min (maxHudWidth, (availableWidth - (numShips - 1) * hudSpacing) / numShips);
+    hudWidth = std::max (minHudWidth, hudWidth);
 
-    int numHuds = (int) hudShipIndices.size();
-    float hudWidth = 200.0f;
     float hudHeight = 50.0f;
-    float hudSpacing = 20.0f;
-    float hudTotalWidth = numHuds * hudWidth + (numHuds - 1) * hudSpacing;
-    float hudStartX = (w - hudTotalWidth) / 2.0f;
+    float hudTotalWidth = numShips * hudWidth + (numShips - 1) * hudSpacing;
+    float hudStartX = 10.0f; // Left align with margin
     float hudY = 10.0f;
 
-    int slot = 0;
-    for (int shipIdx : hudShipIndices)
+    for (int i = 0; i < numShips; ++i)
     {
-        const auto& ship = ships[shipIdx];
-        if (ship && ship->isAlive() && ! ship->isSinking())
+        const auto& ship = ships[i];
+        if (ship)
         {
             // Check if any ship is under this HUD panel
-            float hudX = hudStartX + slot * (hudWidth + hudSpacing);
+            float hudX = hudStartX + i * (hudWidth + hudSpacing);
             float alpha = 1.0f;
 
+            // Fade HUD if ship underneath
             for (const auto& otherShip : ships)
             {
                 if (otherShip && otherShip->isAlive())
                 {
                     Vec2 pos = otherShip->getPosition();
-                    // Check if ship position is within HUD bounds (with some margin)
                     float margin = otherShip->getLength() / 2.0f;
                     if (pos.x > hudX - margin && pos.x < hudX + hudWidth + margin &&
                         pos.y > hudY - margin && pos.y < hudY + hudHeight + margin)
@@ -949,9 +943,12 @@ void Game::renderPlaying()
                 }
             }
 
-            renderer->drawShipHUD (*ship, slot, numHuds, w, alpha);
+            // Dim HUD for dead/sinking ships
+            if (!ship->isAlive() || ship->isSinking())
+                alpha *= 0.4f;
+
+            renderer->drawShipHUD (*ship, i, numShips, w, hudWidth, alpha);
         }
-        slot++;
     }
 
     // Draw wind indicator
@@ -1020,6 +1017,13 @@ void Game::renderGameOver()
     {
         std::string statsText = "P1: " + std::to_string (playerWins[0]) +
                                 "  -  P2: " + std::to_string (playerWins[1]);
+        renderer->drawTextCentered (statsText, { w / 2.0f, h / 2.0f + 40.0f }, 2.5f, statsColor);
+    }
+    else if (gameMode == GameMode::Triple)
+    {
+        std::string statsText = "P1: " + std::to_string (playerWins[0]) +
+                                "  P2: " + std::to_string (playerWins[1]) +
+                                "  P3: " + std::to_string (playerWins[2]);
         renderer->drawTextCentered (statsText, { w / 2.0f, h / 2.0f + 40.0f }, 2.5f, statsColor);
     }
     else
@@ -1164,10 +1168,10 @@ void Game::cycleGameMode (int direction)
     int mode = static_cast<int> (gameMode);
     mode += direction;
 
-    // Wrap around (4 modes: FFA, Teams, Duel, Battle)
+    // Wrap around (5 modes: FFA, Teams, Duel, Triple, Battle)
     if (mode < 0)
-        mode = 3;
-    else if (mode > 3)
+        mode = 4;
+    else if (mode > 4)
         mode = 0;
 
     gameMode = static_cast<GameMode> (mode);
@@ -1177,6 +1181,8 @@ int Game::getNumShipsForMode() const
 {
     if (gameMode == GameMode::Duel)
         return 2;
+    if (gameMode == GameMode::Triple)
+        return 3;
     if (gameMode == GameMode::Battle)
         return 12;
     return 4;  // FFA and Teams
