@@ -48,8 +48,7 @@ public:
     // Health system
     float getHealth() const { return health; }
     float getMaxHealth() const { return maxHealth; }
-    bool isAlive() const { return health > 0; }
-    bool isVisible() const { return health > 0 || (sinking && ! isFullySunk()); }  // For rendering
+    bool isAlive() const { return health > 0 || isSinking(); }
     bool isSinking() const { return sinking; }
     bool isFullySunk() const { return sinking && sinkTimer >= Config::shipSinkDuration; }
     float getSinkProgress() const { return sinking ? sinkTimer / Config::shipSinkDuration : 0.0f; }

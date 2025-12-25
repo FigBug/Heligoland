@@ -307,7 +307,7 @@ void Game::updatePlaying (float dt)
         int aliveCount = 0;
         for (int i = 0; i < numShips; ++i)
         {
-            if (ships[i] && ships[i]->isAlive() && ! ships[i]->isSinking())
+            if (ships[i] && ships[i]->isAlive())
             {
                 totalThrottle += std::abs (ships[i]->getThrottle());
                 aliveCount++;
@@ -346,7 +346,7 @@ void Game::updateGameOver (float dt)
     int numShips = getNumShipsForMode();
     for (int i = 0; i < numShips; ++i)
     {
-        if (ships[i] && ships[i]->isVisible())
+        if (ships[i] && ships[i]->isAlive())
         {
             ships[i]->update (dt, { 0, 0 }, { 0, 0 }, false, arenaWidth, arenaHeight, wind);
         }
@@ -848,7 +848,7 @@ void Game::renderPlaying()
     // Draw bubble trails first (behind everything)
     for (const auto& ship : ships)
     {
-        if (ship && ship->isVisible())
+        if (ship && ship->isAlive())
         {
             renderer->drawBubbleTrail (*ship);
         }
@@ -857,7 +857,7 @@ void Game::renderPlaying()
     // Draw ships
     for (const auto& ship : ships)
     {
-        if (ship && ship->isVisible())
+        if (ship && ship->isAlive())
         {
             renderer->drawShip (*ship);
         }
@@ -866,7 +866,7 @@ void Game::renderPlaying()
     // Draw smoke (above ships)
     for (const auto& ship : ships)
     {
-        if (ship && ship->isVisible())
+        if (ship && ship->isAlive())
         {
             renderer->drawSmoke (*ship);
         }
@@ -928,7 +928,7 @@ void Game::renderPlaying()
 
             for (const auto& otherShip : ships)
             {
-                if (otherShip && otherShip->isVisible())
+                if (otherShip && otherShip->isAlive())
                 {
                     Vec2 pos = otherShip->getPosition();
                     // Check if ship position is within HUD bounds (with some margin)
