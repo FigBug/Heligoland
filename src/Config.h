@@ -45,7 +45,7 @@ namespace Config
     // -------------------------------------------------------------------------
     static constexpr float fireInterval                = 15.0f;     // Seconds between shots
     static constexpr float shellSpeedMultiplier        = 5.0f;      // Shell speed = ship max speed * this
-    static constexpr float shellRadius                 = 3.0f;
+    static constexpr float shellRadius                 = 2.0f;
     static constexpr float shellSplashRadius           = 8.0f;      // Hit detection radius when shell lands
     static constexpr float minShellRange               = 50.0f;     // Minimum range shells can travel
 
@@ -69,12 +69,12 @@ namespace Config
     // Smoke
     // -------------------------------------------------------------------------
     static constexpr float smokeFadeTime               = 10.0f;     // Seconds to fade out
-    static constexpr float smokeWindStrength           = 10.0f;     // How much wind affects smoke
-    static constexpr float smokeBaseSpawnInterval      = 0.0333f;   // ~30 per second when undamaged
+    static constexpr float smokeWindStrength           = 15.0f;     // How much wind affects smoke
+    static constexpr float smokeBaseSpawnInterval      = 0.0433f;   // ~30 per second when undamaged
     static constexpr float smokeDamageMultiplier       = 4.0f;      // Spawn rate increases with damage
     static constexpr float smokeBaseRadius             = 1.5f;
     static constexpr float smokeBaseAlpha              = 0.4f;
-    static constexpr float smokeWindAngleVariation     = 0.105f;    // +/- radians (~6 degrees)
+    static constexpr float smokeWindAngleVariation     = 0.155f;    // +/- radians (~6 degrees)
     static constexpr unsigned char smokeGreyStart      = 80;        // Grey value when not sinking
     static constexpr unsigned char smokeGreyEnd        = 140;       // Grey value when fully sunk
 
