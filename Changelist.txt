@@ -1,3 +1,7 @@
+0.0.8
+- New sounds FX
+- Added sfx volume control
+
 0.0.7
 - Added 1v1 mode
 - Improved AI
