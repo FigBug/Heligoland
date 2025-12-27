@@ -1,3 +1,6 @@
+0.0.9
+- Added ship assets
+
 0.0.8
 - New sounds FX
 - Added sfx volume control
