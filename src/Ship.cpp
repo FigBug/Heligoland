@@ -18,7 +18,7 @@ Ship::Ship (int playerIndex_, Vec2 startPos, float startAngle, int team_)
 void Ship::update (float dt, Vec2 moveInput, Vec2 aimInput, bool fireInput, float arenaWidth, float arenaHeight, Vec2 wind)
 {
     // Handle sinking
-    if (sinking)
+    if (isSinking())
     {
         sinkTimer += dt;
         if (sinkTimer > Config::shipSinkDuration)
@@ -27,6 +27,12 @@ void Ship::update (float dt, Vec2 moveInput, Vec2 aimInput, bool fireInput, floa
         // Slow down while sinking
         velocity *= Config::shipSinkVelocityDecay;
         angularVelocity *= Config::shipSinkAngularDecay;
+        
+        // Update position
+        position += velocity * dt;
+
+        // Clamp to arena
+        clampToArena (arenaWidth, arenaHeight);
 
         // Still update smoke and bubbles while sinking
         updateSmoke (dt, wind);
@@ -414,7 +420,7 @@ void Ship::updateBubbles (float dt)
     }
 
     // Spawn new bubbles at the rear of the ship when moving or throttle applied
-    if (speed > Config::bubbleMinSpeed || std::abs (throttle) > 0.1f)
+    if (isVisible() && (speed > Config::bubbleMinSpeed || (isAlive() && std::abs (throttle) > 0.1f)))
     {
         bubbleSpawnTimer += dt;
 
