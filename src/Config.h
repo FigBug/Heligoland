@@ -152,10 +152,8 @@ namespace Config
     // -------------------------------------------------------------------------
     // Colors - Ships (Team mode)
     // -------------------------------------------------------------------------
-    static constexpr Color colorTeam1Dark              = { 200, 60, 60, 255 };   // Dark red
-    static constexpr Color colorTeam1Light             = { 255, 130, 130, 255 }; // Light red
-    static constexpr Color colorTeam2Dark              = { 60, 60, 200, 255 };   // Dark blue
-    static constexpr Color colorTeam2Light             = { 130, 130, 255, 255 }; // Light blue
+    static constexpr Color colorTeam1                  = { 255, 100, 100, 255 }; // Red
+    static constexpr Color colorTeam2                  = { 100, 100, 255, 255 }; // Blue
 
     // -------------------------------------------------------------------------
     // Colors - UI

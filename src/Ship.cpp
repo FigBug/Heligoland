@@ -248,11 +248,8 @@ Color Ship::getColor() const
 {
     if (team >= 0)
     {
-        // Team mode: alternate between dark and light shades
-        if (team == 0)
-            return (playerIndex % 2 == 0) ? Config::colorTeam1Dark : Config::colorTeam1Light;
-        else
-            return (playerIndex % 2 == 0) ? Config::colorTeam2Dark : Config::colorTeam2Light;
+        // Team mode: single color per team
+        return (team == 0) ? Config::colorTeam1 : Config::colorTeam2;
     }
     else
     {

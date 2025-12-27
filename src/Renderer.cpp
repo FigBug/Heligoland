@@ -77,13 +77,15 @@ Renderer::~Renderer()
     if (noiseTexture2.id != 0)
         UnloadTexture (noiseTexture2);
 
-    // Unload ship textures
+    // Unload ship textures and images
     for (int i = 0; i < 4; ++i)
     {
         if (shipHullTextures[i].id != 0)
             UnloadTexture (shipHullTextures[i]);
         if (shipTurretTextures[i].id != 0)
             UnloadTexture (shipTurretTextures[i]);
+        if (shipHullImages[i].data != nullptr)
+            UnloadImage (shipHullImages[i]);
     }
 }
 
@@ -818,11 +820,17 @@ void Renderer::loadShipTextures()
 
     for (int i = 0; i < 4; ++i)
     {
-        shipHullTextures[i] = LoadTexture (getResourcePath (hullPaths[i]).c_str());
-        if (shipHullTextures[i].id == 0)
-            shipTexturesLoaded = false;
-        else
+        // Load hull image and keep it for pixel-perfect hit testing
+        shipHullImages[i] = LoadImage (getResourcePath (hullPaths[i]).c_str());
+        if (shipHullImages[i].data != nullptr)
+        {
+            shipHullTextures[i] = LoadTextureFromImage (shipHullImages[i]);
             SetTextureFilter (shipHullTextures[i], TEXTURE_FILTER_BILINEAR);
+        }
+        else
+        {
+            shipTexturesLoaded = false;
+        }
 
         shipTurretTextures[i] = LoadTexture (getResourcePath (turretPaths[i]).c_str());
         if (shipTurretTextures[i].id == 0)
@@ -850,24 +858,105 @@ float Renderer::getShipWidth() const
 
 int Renderer::getShipTextureIndex (const Ship& ship) const
 {
-    int playerIndex = ship.getPlayerIndex();
+    int team = ship.getTeam();
+    if (team >= 0)
+        return team; // Team mode: 0=Red, 1=Blue
 
-    // For FFA mode, use playerIndex directly (0=Red, 1=Blue, 2=Green, 3=Yellow)
-    // For team mode, use Red for team 1 and Blue for team 2
-    // We can detect team mode by checking if color matches team colors
+    // FFA mode: use player index (0=Red, 1=Blue, 2=Green, 3=Yellow)
+    return std::clamp (ship.getPlayerIndex(), 0, 3);
+}
 
-    Color color = ship.getColor();
+bool Renderer::checkShipHit (const Ship& ship, Vec2 worldPos) const
+{
+    if (!shipTexturesLoaded)
+        return true; // Fallback to always hit if no textures
 
-    // Check if it's team mode by comparing to team colors
-    if (color.r == Config::colorTeam1Dark.r && color.g == Config::colorTeam1Dark.g && color.b == Config::colorTeam1Dark.b)
-        return 0; // Red for team 1 dark
-    if (color.r == Config::colorTeam1Light.r && color.g == Config::colorTeam1Light.g && color.b == Config::colorTeam1Light.b)
-        return 0; // Red for team 1 light
-    if (color.r == Config::colorTeam2Dark.r && color.g == Config::colorTeam2Dark.g && color.b == Config::colorTeam2Dark.b)
-        return 1; // Blue for team 2 dark
-    if (color.r == Config::colorTeam2Light.r && color.g == Config::colorTeam2Light.g && color.b == Config::colorTeam2Light.b)
-        return 1; // Blue for team 2 light
+    int texIdx = getShipTextureIndex (ship);
+    const Image& img = shipHullImages[texIdx];
+    if (img.data == nullptr)
+        return true; // Fallback
 
-    // FFA mode - map playerIndex to texture
-    return std::clamp (playerIndex, 0, 3);
+    // Transform world position to ship-local coordinates
+    Vec2 shipPos = ship.getPosition();
+    float angle = ship.getAngle();
+    float cosA = std::cos (angle);
+    float sinA = std::sin (angle);
+
+    float dx = worldPos.x - shipPos.x;
+    float dy = worldPos.y - shipPos.y;
+
+    // Rotate to ship-local (X = forward toward bow, Y = starboard)
+    float localX = dx * cosA + dy * sinA;
+    float localY = -dx * sinA + dy * cosA;
+
+    // Convert to image coordinates
+    // Image has bow pointing UP, so:
+    // - imageX corresponds to ship's Y (starboard)
+    // - imageY corresponds to -ship's X (bow is up = negative Y in image)
+    float imgCenterX = img.width / 2.0f;
+    float imgCenterY = img.height / 2.0f;
+
+    int imageX = (int) (imgCenterX + localY);
+    int imageY = (int) (imgCenterY - localX);
+
+    // Check bounds
+    if (imageX < 0 || imageX >= img.width || imageY < 0 || imageY >= img.height)
+        return false; // Outside image bounds = miss
+
+    // Get pixel color and check alpha
+    Color pixel = GetImageColor (img, imageX, imageY);
+    return pixel.a > 0; // Hit if not fully transparent
+}
+
+bool Renderer::checkShipCollision (const Ship& shipA, const Ship& shipB, Vec2& collisionPoint) const
+{
+    if (!shipTexturesLoaded)
+        return false;
+
+    int texIdxA = getShipTextureIndex (shipA);
+    const Image& imgA = shipHullImages[texIdxA];
+    if (imgA.data == nullptr)
+        return false;
+
+    // Quick bounding check first
+    Vec2 posA = shipA.getPosition();
+    Vec2 posB = shipB.getPosition();
+    float maxDist = (shipA.getLength() + shipB.getLength()) / 2.0f;
+    if ((posA - posB).length() > maxDist)
+        return false;
+
+    // Sample points along ship A's hull outline and check against ship B
+    float angleA = shipA.getAngle();
+    float cosA = std::cos (angleA);
+    float sinA = std::sin (angleA);
+
+    // Scan through ship A's image and check non-transparent edge pixels against ship B
+    int stepSize = 2; // Check every 2nd pixel for performance
+    for (int iy = 0; iy < imgA.height; iy += stepSize)
+    {
+        for (int ix = 0; ix < imgA.width; ix += stepSize)
+        {
+            Color pixelA = GetImageColor (imgA, ix, iy);
+            if (pixelA.a == 0)
+                continue; // Skip transparent pixels
+
+            // Convert image coords to ship-local coords
+            float localX = (imgA.height / 2.0f) - iy; // Forward direction
+            float localY = ix - (imgA.width / 2.0f);  // Starboard direction
+
+            // Convert to world coords
+            Vec2 worldPos;
+            worldPos.x = posA.x + localX * cosA - localY * sinA;
+            worldPos.y = posA.y + localX * sinA + localY * cosA;
+
+            // Check if this point hits ship B
+            if (checkShipHit (shipB, worldPos))
+            {
+                collisionPoint = worldPos;
+                return true;
+            }
+        }
+    }
+
+    return false;
 }

@@ -456,12 +456,12 @@ void Game::checkCollisions()
             if (ship->getPlayerIndex() == shell.getOwnerIndex())
                 continue; // Don't hit own ship
 
-            // Check if ship is within splash radius
+            // First do a quick bounding check, then pixel-perfect if within bounds
             Vec2 diff = shell.getPosition() - ship->getPosition();
             float dist = diff.length();
-            float hitRadius = ship->getLength() / 2.0f; // Approximate ship as circle
+            float boundingRadius = ship->getLength() / 2.0f + shell.getSplashRadius();
 
-            if (dist < hitRadius + shell.getSplashRadius())
+            if (dist < boundingRadius && renderer->checkShipHit (*ship, shell.getPosition()))
             {
                 float arenaWidth, arenaHeight;
                 getWindowSize (arenaWidth, arenaHeight);
@@ -586,6 +586,11 @@ void Game::checkCollisions()
 
             if (! separated)
             {
+                // OBB overlap detected - now do pixel-perfect check
+                Vec2 collisionPoint;
+                if (!renderer->checkShipCollision (*ships[i], *ships[j], collisionPoint))
+                    continue; // No actual pixel overlap
+
                 // Collision detected!
                 Vec2 velA = ships[i]->getVelocity();
                 Vec2 velB = ships[j]->getVelocity();
@@ -599,13 +604,12 @@ void Game::checkCollisions()
                 ships[i]->takeDamage (damage);
                 ships[j]->takeDamage (damage);
 
-                // Play collision sound at midpoint between ships
+                // Play collision sound at collision point
                 if (audio && impactSpeed > Config::aiMinImpactForSound)
                 {
                     float arenaWidth, arenaHeight;
                     getWindowSize (arenaWidth, arenaHeight);
-                    Vec2 midpoint = (ships[i]->getPosition() + ships[j]->getPosition()) * 0.5f;
-                    audio->playCollision (midpoint.x, arenaWidth);
+                    audio->playCollision (collisionPoint.x, arenaWidth);
                 }
 
                 // Determine collision normal (from i to j)
@@ -976,8 +980,8 @@ void Game::renderPlaying()
         std::string team2Text = std::to_string (team2Alive);
 
         // Draw on left and right sides of screen
-        renderer->drawTextCentered (team1Text, { 50.0f, h / 2.0f }, 6.0f, Config::colorTeam1Dark);
-        renderer->drawTextCentered (team2Text, { w - 50.0f, h / 2.0f }, 6.0f, Config::colorTeam2Dark);
+        renderer->drawTextCentered (team1Text, { 50.0f, h / 2.0f }, 6.0f, Config::colorTeam1);
+        renderer->drawTextCentered (team2Text, { w - 50.0f, h / 2.0f }, 6.0f, Config::colorTeam2);
     }
 }
 

@@ -41,6 +41,10 @@ public:
     float getShipLength() const;
     float getShipWidth() const;
 
+    // Pixel-perfect hit testing
+    bool checkShipHit (const Ship& ship, Vec2 worldPos) const;
+    bool checkShipCollision (const Ship& shipA, const Ship& shipB, Vec2& collisionPoint) const;
+
 private:
     void createNoiseTexture();
     void loadShipTextures();
@@ -53,8 +57,9 @@ private:
     Texture2D noiseTexture2 = { 0 };
     static constexpr int noiseTextureSize = 128;
 
-    // Ship textures: 0=Red, 1=Blue, 2=Green, 3=Yellow
+    // Ship textures: 0=Blue, 1=Red, 2=Green, 3=Yellow
     Texture2D shipHullTextures[4] = {};
     Texture2D shipTurretTextures[4] = {};
+    Image shipHullImages[4] = {};  // Keep images for pixel-perfect hit testing
     bool shipTexturesLoaded = false;
 };

@@ -36,6 +36,7 @@ public:
     float getWidth() const                          { return width; }
     float getMaxSpeed() const                       { return maxSpeed; }
     int getPlayerIndex() const                      { return playerIndex; }
+    int getTeam() const                             { return team; }  // -1=FFA, 0=team1, 1=team2
     const std::array<Turret, 4>& getTurrets() const { return turrets; }
     Vec2 getCrosshairPosition() const               { return position + crosshairOffset; }
     void setCrosshairPosition (Vec2 worldPos);  // For mouse aiming
