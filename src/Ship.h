@@ -26,7 +26,7 @@ struct Smoke
 class Ship
 {
 public:
-    Ship (int playerIndex, Vec2 startPos, float startAngle, int team = -1);  // team: -1=FFA, 0=team1, 1=team2
+    Ship (int playerIndex, Vec2 startPos, float startAngle, float shipLength, float shipWidth, int team = -1);  // team: -1=FFA, 0=team1, 1=team2
 
     void update (float dt, Vec2 moveInput, Vec2 aimInput, bool fireInput, float arenaWidth, float arenaHeight, Vec2 wind);
 
@@ -77,8 +77,8 @@ private:
     float angle = 0.0f; // Ship facing direction (radians)
     float angularVelocity = 0.0f;
 
-    float length = Config::shipLength;
-    float width = Config::shipWidth;
+    float length;
+    float width;
     float maxSpeed = Config::shipMaxSpeed;
 
     float throttle = 0.0f; // -1 to 1 (current throttle position)

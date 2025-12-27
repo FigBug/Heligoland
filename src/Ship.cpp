@@ -3,13 +3,15 @@
 #include <algorithm>
 #include <cmath>
 
-Ship::Ship (int playerIndex_, Vec2 startPos, float startAngle, int team_)
-    : playerIndex (playerIndex_), team (team_), position (startPos), angle (startAngle), turrets { {
-                                                                                                     Turret ({ length * 0.35f, 0.0f }, true), // Front
-                                                                                                     Turret ({ length * 0.12f, 0.0f }, true), // Front-mid
-                                                                                                     Turret ({ -length * 0.12f, 0.0f }, false), // Rear-mid
-                                                                                                     Turret ({ -length * 0.35f, 0.0f }, false) // Rear
-                                                                                                 } }
+Ship::Ship (int playerIndex_, Vec2 startPos, float startAngle, float shipLength, float shipWidth, int team_)
+    : playerIndex (playerIndex_), team (team_), position (startPos), angle (startAngle),
+      length (shipLength), width (shipWidth),
+      turrets { {
+          Turret ({ length * 0.35f, 0.0f }, true), // Front
+          Turret ({ length * 0.12f, 0.0f }, true), // Front-mid
+          Turret ({ -length * 0.12f, 0.0f }, false), // Rear-mid
+          Turret ({ -length * 0.35f, 0.0f }, false) // Rear
+      } }
 {
     // Start crosshair in front of ship
     crosshairOffset = Vec2::fromAngle (angle) * Config::crosshairStartDistance;

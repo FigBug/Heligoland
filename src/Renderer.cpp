@@ -3,12 +3,71 @@
 #include "Game.h"
 #include "Shell.h"
 #include "Ship.h"
+#include <algorithm>
 #include <cmath>
 #include <vector>
+
+#ifdef __APPLE__
+#include <CoreFoundation/CoreFoundation.h>
+#include <string>
+
+static std::string getResourcePath (const char* filename)
+{
+    CFBundleRef mainBundle = CFBundleGetMainBundle();
+    if (mainBundle)
+    {
+        CFURLRef resourceURL = CFBundleCopyResourcesDirectoryURL (mainBundle);
+        if (resourceURL)
+        {
+            char path[PATH_MAX];
+            if (CFURLGetFileSystemRepresentation (resourceURL, true, (UInt8*) path, PATH_MAX))
+            {
+                CFRelease (resourceURL);
+                return std::string (path) + "/" + filename;
+            }
+            CFRelease (resourceURL);
+        }
+    }
+    return filename;
+}
+#elif defined(__linux__)
+#include <string>
+#include <unistd.h>
+#include <linux/limits.h>
+
+static std::string getResourcePath (const char* filename)
+{
+    if (access (filename, F_OK) == 0)
+        return filename;
+
+    char exePath[PATH_MAX];
+    ssize_t len = readlink ("/proc/self/exe", exePath, sizeof (exePath) - 1);
+    if (len != -1)
+    {
+        exePath[len] = '\0';
+        std::string dir (exePath);
+        size_t lastSlash = dir.find_last_of ('/');
+        if (lastSlash != std::string::npos)
+        {
+            dir = dir.substr (0, lastSlash + 1);
+            return dir + filename;
+        }
+    }
+    return filename;
+}
+#else
+#include <string>
+
+static std::string getResourcePath (const char* filename)
+{
+    return filename;
+}
+#endif
 
 Renderer::Renderer()
 {
     createNoiseTexture();
+    loadShipTextures();
 }
 
 Renderer::~Renderer()
@@ -17,6 +76,15 @@ Renderer::~Renderer()
         UnloadTexture (noiseTexture1);
     if (noiseTexture2.id != 0)
         UnloadTexture (noiseTexture2);
+
+    // Unload ship textures
+    for (int i = 0; i < 4; ++i)
+    {
+        if (shipHullTextures[i].id != 0)
+            UnloadTexture (shipHullTextures[i]);
+        if (shipTurretTextures[i].id != 0)
+            UnloadTexture (shipTurretTextures[i]);
+    }
 }
 
 void Renderer::clear()
@@ -81,7 +149,6 @@ void Renderer::drawShip (const Ship& ship)
 {
     Vec2 pos = ship.getPosition();
     float angle = ship.getAngle();
-    Color color = ship.getColor();
 
     // Draw firing range circle (very faint white) - only for non-sinking ships
     if (ship.isAlive())
@@ -92,41 +159,75 @@ void Renderer::drawShip (const Ship& ship)
     if (ship.isSinking())
         alpha = 1.0f - ship.getSinkProgress();
 
-    // Apply alpha to ship color
-    color.a = (unsigned char) (255 * alpha);
+    // Apply alpha to tint color
+    Color tint = { 255, 255, 255, (unsigned char) (255 * alpha) };
 
-    // Draw ship hull - pointy bow, squarer stern
-    drawShipHull (pos, ship.getLength(), ship.getWidth(), angle, color);
+    int texIdx = getShipTextureIndex (ship);
 
-    // Draw turrets
-    float cosA = std::cos (angle);
-    float sinA = std::sin (angle);
-
-    for (const auto& turret : ship.getTurrets())
+    if (shipTexturesLoaded && shipHullTextures[texIdx].id != 0)
     {
-        Vec2 localOffset = turret.getLocalOffset();
+        // Draw hull using texture at its natural size
+        Texture2D& hullTex = shipHullTextures[texIdx];
 
-        // Rotate local offset by ship angle
-        Vec2 worldOffset;
-        worldOffset.x = localOffset.x * cosA - localOffset.y * sinA;
-        worldOffset.y = localOffset.x * sinA + localOffset.y * cosA;
+        float hullWidth = (float) hullTex.width;
+        float hullHeight = (float) hullTex.height;
 
-        Vec2 turretPos = pos + worldOffset;
+        Rectangle source = { 0, 0, hullWidth, hullHeight };
+        Rectangle dest = { pos.x, pos.y, hullWidth, hullHeight };
 
-        // Draw turret base (darker circle)
-        Color turretColor = {
-            (unsigned char) (color.r * 0.6f),
-            (unsigned char) (color.g * 0.6f),
-            (unsigned char) (color.b * 0.6f),
-            (unsigned char) (255 * alpha)
-        };
-        drawFilledCircle (turretPos, turret.getRadius(), turretColor);
+        // Origin at center for rotation
+        Vector2 origin = { hullWidth / 2.0f, hullHeight / 2.0f };
 
-        // Draw barrel (line from turret center outward)
-        float turretAngle = turret.getWorldAngle (angle);
-        Vec2 barrelEnd = turretPos + Vec2::fromAngle (turretAngle) * turret.getBarrelLength();
-        Color barrelColor = { Config::colorBarrel.r, Config::colorBarrel.g, Config::colorBarrel.b, (unsigned char) (255 * alpha) };
-        drawLine (turretPos, barrelEnd, barrelColor);
+        // Convert angle from radians to degrees, add 90 to rotate from up-pointing image
+        float angleDeg = angle * (180.0f / pi) + 90.0f;
+
+        DrawTexturePro (hullTex, source, dest, origin, angleDeg, tint);
+
+        // Draw turrets using textures at their natural size
+        // Turret positions from bottom of hull image (bow is at top)
+        // Order: front, front-mid, rear-mid, rear
+        float turretFromBottom[4] = { 74.0f, 67.0f, 23.0f, 13.0f };
+        float hullCenter = hullHeight / 2.0f;
+        float turretOffsets[4];
+        for (int i = 0; i < 4; ++i)
+            turretOffsets[i] = turretFromBottom[i] - hullCenter;
+
+        float cosA = std::cos (angle);
+        float sinA = std::sin (angle);
+
+        const auto& turrets = ship.getTurrets();
+        for (int i = 0; i < 4; ++i)
+        {
+            const auto& turret = turrets[i];
+
+            // Local offset along ship's forward axis (X in ship coords)
+            Vec2 localOffset = { turretOffsets[i], 0.0f };
+
+            // Rotate local offset by ship angle
+            Vec2 worldOffset;
+            worldOffset.x = localOffset.x * cosA - localOffset.y * sinA;
+            worldOffset.y = localOffset.x * sinA + localOffset.y * cosA;
+
+            Vec2 turretPos = pos + worldOffset;
+
+            if (shipTurretTextures[texIdx].id != 0)
+            {
+                Texture2D& turretTex = shipTurretTextures[texIdx];
+
+                float turretWidth = (float) turretTex.width;
+                float turretHeight = (float) turretTex.height;
+
+                Rectangle turretSource = { 0, 0, turretWidth, turretHeight };
+                Rectangle turretDest = { turretPos.x, turretPos.y, turretWidth, turretHeight };
+                Vector2 turretOrigin = { 5.0f, 11.0f };
+
+                // Turret angle, add 90 to rotate from up-pointing image
+                float turretAngle = turret.getWorldAngle (angle);
+                float turretAngleDeg = turretAngle * (180.0f / pi) + 90.0f;
+
+                DrawTexturePro (turretTex, turretSource, turretDest, turretOrigin, turretAngleDeg, tint);
+            }
+        }
     }
 }
 
@@ -280,7 +381,10 @@ void Renderer::drawShipHUD (const Ship& ship, int slot, int totalSlots, float sc
 {
     float hudHeight = 50.0f;
     float spacing = 10.0f;
-    float startX = 10.0f; // Left aligned
+
+    // Center HUDs horizontally
+    float totalWidth = totalSlots * hudWidth + (totalSlots - 1) * spacing;
+    float startX = (screenWidth - totalWidth) / 2.0f;
     float x = startX + slot * (hudWidth + spacing);
     float y = 10.0f;
 
@@ -359,9 +463,9 @@ void Renderer::drawShipHUD (const Ship& ship, int slot, int totalSlots, float sc
 
 void Renderer::drawWindIndicator (Vec2 wind, float screenWidth, float screenHeight)
 {
-    // Draw wind indicator in upper-right corner
+    // Draw wind indicator in bottom-left corner
     float indicatorSize = 20.0f;
-    Vec2 center = { screenWidth - 35, 35 };
+    Vec2 center = { 35, screenHeight - 35 };
 
     // Background circle
     drawFilledCircle (center, indicatorSize, Config::colorWindBackground);
@@ -459,88 +563,6 @@ void Renderer::drawFilledOval (Vec2 center, float width, float height, float ang
         255
     };
     drawOval (center, width, height, angle, outlineColor);
-}
-
-void Renderer::drawShipHull (Vec2 center, float length, float width, float angle, Color color)
-{
-    float cosA = std::cos (angle);
-    float sinA = std::sin (angle);
-
-    float halfLength = length / 2.0f;
-    float halfWidth = width / 2.0f;
-
-    // Helper lambda to get hull half-width at a given t position (-1 to 1)
-    auto getHalfWidth = [halfWidth] (float t) -> float
-    {
-        if (t > 0.7f)
-        {
-            // Bow section - taper to a point
-            float bowT = (t - 0.7f) / 0.3f;
-            return halfWidth * (1.0f - bowT * bowT);
-        }
-        else if (t < -0.6f)
-        {
-            // Stern section - slightly rounded but more square
-            float sternT = (-t - 0.6f) / 0.4f;
-            return halfWidth * (1.0f - sternT * sternT * 0.3f);
-        }
-        else
-        {
-            // Main body - full width with slight curve
-            float bodyT = (t + 0.6f) / 1.3f;
-            return halfWidth * (1.0f + 0.05f * std::sin (bodyT * pi));
-        }
-    };
-
-    // Build hull outline points
-    std::vector<Vector2> hullPoints;
-    int segments = 32;
-
-    // Top edge (stern to bow)
-    for (int i = 0; i <= segments; ++i)
-    {
-        float t = (float) i / segments * 2.0f - 1.0f;
-        float localX = t * halfLength;
-        float localY = getHalfWidth (t);
-
-        float wx = localX * cosA - localY * sinA + center.x;
-        float wy = localX * sinA + localY * cosA + center.y;
-        hullPoints.push_back ({ wx, wy });
-    }
-
-    // Bottom edge (bow to stern)
-    for (int i = segments; i >= 0; --i)
-    {
-        float t = (float) i / segments * 2.0f - 1.0f;
-        float localX = t * halfLength;
-        float localY = -getHalfWidth (t);
-
-        float wx = localX * cosA - localY * sinA + center.x;
-        float wy = localX * sinA + localY * cosA + center.y;
-        hullPoints.push_back ({ wx, wy });
-    }
-
-    // Draw filled polygon using triangle fan from center
-    Vector2 centerVec = { center.x, center.y };
-    for (size_t i = 0; i < hullPoints.size(); ++i)
-    {
-        size_t next = (i + 1) % hullPoints.size();
-        DrawTriangle (centerVec, hullPoints[i], hullPoints[next], color);
-    }
-
-    // Draw smooth outline
-    Color outlineColor = {
-        (unsigned char) (color.r * 0.5f),
-        (unsigned char) (color.g * 0.5f),
-        (unsigned char) (color.b * 0.5f),
-        color.a
-    };
-
-    for (size_t i = 0; i < hullPoints.size(); ++i)
-    {
-        size_t next = (i + 1) % hullPoints.size();
-        DrawLineEx (hullPoints[i], hullPoints[next], 1.5f, outlineColor);
-    }
 }
 
 void Renderer::drawCircle (Vec2 center, float radius, Color color)
@@ -774,4 +796,78 @@ void Renderer::createNoiseTexture()
     noiseTexture2 = LoadTextureFromImage (noiseImage2);
     UnloadImage (noiseImage2);
     SetTextureFilter (noiseTexture2, TEXTURE_FILTER_BILINEAR);
+}
+
+void Renderer::loadShipTextures()
+{
+    const char* hullPaths[4] = {
+        "assets/RED_ship_HULL.png",
+        "assets/BLUE_ship_HULL.png",
+        "assets/GREEN_ship_HULL.png",
+        "assets/YELLOW_ship_HULL.png"
+    };
+
+    const char* turretPaths[4] = {
+        "assets/RED_ship_TURRET.png",
+        "assets/BLUE_ship_TURRET.png",
+        "assets/GREEN_ship_TURRET.png",
+        "assets/YELLOW_ship_TURRET.png"
+    };
+
+    shipTexturesLoaded = true;
+
+    for (int i = 0; i < 4; ++i)
+    {
+        shipHullTextures[i] = LoadTexture (getResourcePath (hullPaths[i]).c_str());
+        if (shipHullTextures[i].id == 0)
+            shipTexturesLoaded = false;
+        else
+            SetTextureFilter (shipHullTextures[i], TEXTURE_FILTER_BILINEAR);
+
+        shipTurretTextures[i] = LoadTexture (getResourcePath (turretPaths[i]).c_str());
+        if (shipTurretTextures[i].id == 0)
+            shipTexturesLoaded = false;
+        else
+            SetTextureFilter (shipTurretTextures[i], TEXTURE_FILTER_BILINEAR);
+    }
+}
+
+float Renderer::getShipLength() const
+{
+    // Ship length is the hull texture height (bow points up in image)
+    if (shipTexturesLoaded && shipHullTextures[0].id != 0)
+        return (float) shipHullTextures[0].height;
+    return Config::shipLength; // Fallback
+}
+
+float Renderer::getShipWidth() const
+{
+    // Ship width is the hull texture width
+    if (shipTexturesLoaded && shipHullTextures[0].id != 0)
+        return (float) shipHullTextures[0].width;
+    return Config::shipWidth; // Fallback
+}
+
+int Renderer::getShipTextureIndex (const Ship& ship) const
+{
+    int playerIndex = ship.getPlayerIndex();
+
+    // For FFA mode, use playerIndex directly (0=Red, 1=Blue, 2=Green, 3=Yellow)
+    // For team mode, use Red for team 1 and Blue for team 2
+    // We can detect team mode by checking if color matches team colors
+
+    Color color = ship.getColor();
+
+    // Check if it's team mode by comparing to team colors
+    if (color.r == Config::colorTeam1Dark.r && color.g == Config::colorTeam1Dark.g && color.b == Config::colorTeam1Dark.b)
+        return 0; // Red for team 1 dark
+    if (color.r == Config::colorTeam1Light.r && color.g == Config::colorTeam1Light.g && color.b == Config::colorTeam1Light.b)
+        return 0; // Red for team 1 light
+    if (color.r == Config::colorTeam2Dark.r && color.g == Config::colorTeam2Dark.g && color.b == Config::colorTeam2Dark.b)
+        return 1; // Blue for team 2 dark
+    if (color.r == Config::colorTeam2Light.r && color.g == Config::colorTeam2Light.g && color.b == Config::colorTeam2Light.b)
+        return 1; // Blue for team 2 light
+
+    // FFA mode - map playerIndex to texture
+    return std::clamp (playerIndex, 0, 3);
 }

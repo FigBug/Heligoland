@@ -210,10 +210,12 @@ void Game::startGame()
     // Create ships at starting positions
     bool isTeamMode = (gameMode == GameMode::Teams || gameMode == GameMode::Battle);
     int numShips = getNumShipsForMode();
+    float shipLength = renderer->getShipLength();
+    float shipWidth = renderer->getShipWidth();
     for (int i = 0; i < numShips; ++i)
     {
         int team = isTeamMode ? getTeam (i) : -1;
-        ships[i] = std::make_unique<Ship> (i, getShipStartPosition (i), getShipStartAngle (i), team);
+        ships[i] = std::make_unique<Ship> (i, getShipStartPosition (i), getShipStartAngle (i), shipLength, shipWidth, team);
     }
 
     shells.clear();

@@ -37,14 +37,24 @@ public:
     void drawText (const std::string& text, Vec2 position, float scale, Color color);
     void drawTextCentered (const std::string& text, Vec2 center, float scale, Color color);
 
+    // Ship dimensions from loaded textures
+    float getShipLength() const;
+    float getShipWidth() const;
+
 private:
     void createNoiseTexture();
+    void loadShipTextures();
     void drawFilledOval (Vec2 center, float width, float height, float angle, Color color);
     void drawFilledCircle (Vec2 center, float radius, Color color);
-    void drawShipHull (Vec2 center, float length, float width, float angle, Color color);
     void drawChar (char c, Vec2 position, float scale, Color color);
+    int getShipTextureIndex (const Ship& ship) const;
 
     Texture2D noiseTexture1 = { 0 };
     Texture2D noiseTexture2 = { 0 };
     static constexpr int noiseTextureSize = 128;
+
+    // Ship textures: 0=Red, 1=Blue, 2=Green, 3=Yellow
+    Texture2D shipHullTextures[4] = {};
+    Texture2D shipTurretTextures[4] = {};
+    bool shipTexturesLoaded = false;
 };
