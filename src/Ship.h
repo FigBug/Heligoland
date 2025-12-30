@@ -51,7 +51,7 @@ public:
     float getMaxHealth() const      { return maxHealth; }
     bool isAlive() const            { return health > 0; }
     bool isVisible() const          { return isAlive() || isSinking(); }
-    bool isSinking() const          { return sinking; }
+    bool isSinking() const          { return sinking && sinkTimer < Config::shipSinkDuration; }
     bool isFullySunk() const        { return sinking && sinkTimer >= Config::shipSinkDuration; }
     float getSinkProgress() const   { return sinking ? sinkTimer / Config::shipSinkDuration : 0.0f; }
     void takeDamage (float damage);
