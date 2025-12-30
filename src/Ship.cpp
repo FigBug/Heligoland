@@ -93,7 +93,10 @@ void Ship::update (float dt, Vec2 moveInput, Vec2 aimInput, bool fireInput, floa
     // Apply throttle to velocity (reduced by damage)
     Vec2 forward = Vec2::fromAngle (angle);
     float effectiveMaxSpeed = config.shipMaxSpeed * damagePenalty;
-    float targetSpeed = throttle * effectiveMaxSpeed;
+    float effectiveThrottle = throttle;
+    if (throttle < 0)
+        effectiveThrottle = throttle * config.shipReverseSpeedMultiplier; // Reverse is slower
+    float targetSpeed = effectiveThrottle * effectiveMaxSpeed;
 
     // Calculate current speed with sign (positive = forward, negative = backward)
     float currentSpeed = velocity.dot (forward);

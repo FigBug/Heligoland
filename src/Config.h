@@ -41,6 +41,7 @@ public:
     float shipSinkDuration            = 30.0f;     // Seconds to fully sink
     float shipSinkVelocityDecay       = 0.98f;
     float shipSinkAngularDecay        = 0.95f;
+    float shipReverseSpeedMultiplier  = 0.4f;      // Max reverse speed as fraction of forward
 
     // -------------------------------------------------------------------------
     // Ship Health

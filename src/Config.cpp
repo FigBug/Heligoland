@@ -103,6 +103,7 @@ bool Config::load()
     loadValue (j, "shipSinkDuration", shipSinkDuration);
     loadValue (j, "shipSinkVelocityDecay", shipSinkVelocityDecay);
     loadValue (j, "shipSinkAngularDecay", shipSinkAngularDecay);
+    loadValue (j, "shipReverseSpeedMultiplier", shipReverseSpeedMultiplier);
 
     // Ship Health
     loadValue (j, "shipMaxHealth", shipMaxHealth);
@@ -273,6 +274,7 @@ bool Config::save() const
     j["shipSinkDuration"] = shipSinkDuration;
     j["shipSinkVelocityDecay"] = shipSinkVelocityDecay;
     j["shipSinkAngularDecay"] = shipSinkAngularDecay;
+    j["shipReverseSpeedMultiplier"] = shipReverseSpeedMultiplier;
 
     // Ship Health
     j["shipMaxHealth"] = shipMaxHealth;
