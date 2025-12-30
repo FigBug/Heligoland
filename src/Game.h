@@ -31,8 +31,8 @@ struct Explosion
 {
     Vec2 position;
     float timer = 0.0f;
-    float duration = Config::explosionDuration;
-    float maxRadius = Config::explosionMaxRadius;
+    float duration = 0.0f;  // Set at creation, defaults applied in Game.cpp
+    float maxRadius = 0.0f; // Set at creation, defaults applied in Game.cpp
     bool isHit = false; // true = explosion (orange), false = splash (blue)
 
     float getProgress() const { return timer / duration; }

@@ -176,7 +176,7 @@ void Audio::playCannon (float screenX, float screenWidth)
 
     int idx = rng() % 2;
     playWithVariation (cannonSounds[idx], screenX, screenWidth);
-    gunSilenceTimer = Config::audioGunSilenceDuration;
+    gunSilenceTimer = config.audioGunSilenceDuration;
 }
 
 void Audio::playSplash (float screenX, float screenWidth)
@@ -229,12 +229,14 @@ void Audio::playWithVariation (Sound& sound, float screenX, float screenWidth)
 
 float Audio::randomPitchVariation()
 {
-    return pitchDist (rng);
+    std::uniform_real_distribution<float> dist (1.0f - config.audioPitchVariation, 1.0f + config.audioPitchVariation);
+    return dist (rng);
 }
 
 float Audio::randomGainVariation()
 {
-    return gainDist (rng);
+    std::uniform_real_distribution<float> dist (1.0f - config.audioGainVariation, 1.0f + config.audioGainVariation);
+    return dist (rng);
 }
 
 float Audio::panFromScreenX (float screenX, float screenWidth)

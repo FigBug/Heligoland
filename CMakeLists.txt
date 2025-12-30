@@ -32,6 +32,9 @@ set(SOURCES
     src/AIController.cpp
     src/Renderer.cpp
     src/Audio.cpp
+    src/Platform.cpp
+    src/Config.cpp
+    src/FileSystemWatcher.cpp
 )
 
 if(WIN32)
@@ -49,6 +52,8 @@ set(HEADERS
     src/Renderer.h
     src/Audio.h
     src/Vec2.h
+    src/Platform.h
+    src/FileSystemWatcher.h
 )
 
 source_group("Source Files" FILES ${SOURCES} ${HEADERS})
@@ -73,6 +78,7 @@ endif()
 
 target_include_directories(${PROJECT_NAME} PRIVATE
     ${CMAKE_CURRENT_SOURCE_DIR}/src
+    ${CMAKE_CURRENT_SOURCE_DIR}/modules/json/include
 )
 
 target_link_libraries(${PROJECT_NAME} PRIVATE raylib)

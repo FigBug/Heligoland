@@ -32,7 +32,7 @@ float Turret::clampAngleToArc (float desiredAngle) const
     while (desiredAngle < -pi)
         desiredAngle += 2.0f * pi;
 
-    float arcSize = pi * Config::turretArcSize;
+    float arcSize = pi * config.turretArcSize;
 
     if (isFront)
     {
@@ -88,8 +88,8 @@ void Turret::update (float dt, float shipAngle, Vec2 targetDir)
         targetAngle = clampAngleToArc (relativeAngle);
     }
 
-    float maxRotation = rotationSpeed * dt;
-    float arcSize = pi * Config::turretArcSize;
+    float maxRotation = config.turretRotationSpeed * dt;
+    float arcSize = pi * config.turretArcSize;
     float limit = pi - arcSize; // The forbidden zone boundary
 
     // Determine which direction to rotate
@@ -208,7 +208,7 @@ bool Turret::isAimedAtTarget() const
     while (angleDiff < -pi)
         angleDiff += 2.0f * pi;
 
-    return std::abs (angleDiff) < Config::turretOnTargetTolerance;
+    return std::abs (angleDiff) < config.turretOnTargetTolerance;
 }
 
 bool Turret::isOnTarget() const
@@ -219,7 +219,7 @@ bool Turret::isOnTarget() const
 
 bool Turret::isAtArcLimit() const
 {
-    float arcSize = pi * Config::turretArcSize;
+    float arcSize = pi * config.turretArcSize;
     float tolerance = 0.05f;
 
     if (isFront)

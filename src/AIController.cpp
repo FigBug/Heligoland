@@ -53,7 +53,7 @@ const Ship* AIController::findTarget (const Ship& myShip, const std::vector<cons
         return nullptr;
 
     Vec2 myPos = myShip.getPosition();
-    float firingRange = Config::maxCrosshairDistance * personalityFactor;
+    float firingRange = config.maxCrosshairDistance * personalityFactor;
 
     // Separate enemies into in-range and out-of-range
     std::vector<const Ship*> inRange;
@@ -168,10 +168,10 @@ void AIController::updateMovement (float dt, const Ship& myShip, const std::vect
         wanderTimer -= dt;
         if (wanderTimer <= 0.0f)
         {
-            float wanderMargin = Config::aiWanderMargin;
+            float wanderMargin = config.aiWanderMargin;
             wanderTarget.x = wanderMargin + (rand() / (float) RAND_MAX) * (arenaWidth - 2 * wanderMargin);
             wanderTarget.y = wanderMargin + (rand() / (float) RAND_MAX) * (arenaHeight - 2 * wanderMargin);
-            wanderTimer = wanderInterval + (rand() / (float) RAND_MAX) * 2.0f;
+            wanderTimer = config.aiWanderInterval + (rand() / (float) RAND_MAX) * 2.0f;
         }
         desiredDir = (wanderTarget - myPos).normalized();
     }
@@ -203,7 +203,7 @@ void AIController::updateMovement (float dt, const Ship& myShip, const std::vect
             float dist = toTarget.length();
 
             // Get close but not too close (stay at half firing range)
-            float idealDist = Config::maxCrosshairDistance * 0.5f * personalityFactor;
+            float idealDist = config.maxCrosshairDistance * 0.5f * personalityFactor;
             if (dist > idealDist)
             {
                 desiredDir = toTarget.normalized();
@@ -235,11 +235,11 @@ void AIController::updateMovement (float dt, const Ship& myShip, const std::vect
             bool inEnemyFiringArc = dotProduct > 0.0f;  // Enemy can see us
 
             // Ideal distance - stay just inside our max range, but outside if enemy is aiming at us
-            float idealDist = Config::maxCrosshairDistance * 0.9f * personalityFactor;
-            if (inEnemyFiringArc && dist < Config::maxCrosshairDistance * personalityFactor)
+            float idealDist = config.maxCrosshairDistance * 0.9f * personalityFactor;
+            if (inEnemyFiringArc && dist < config.maxCrosshairDistance * personalityFactor)
             {
                 // Enemy can shoot at us - prefer to stay further back
-                idealDist = Config::maxCrosshairDistance * 1.05f * personalityFactor;
+                idealDist = config.maxCrosshairDistance * 1.05f * personalityFactor;
             }
 
             float tolerance = 40.0f * personalityFactor;
@@ -254,7 +254,7 @@ void AIController::updateMovement (float dt, const Ship& myShip, const std::vect
                 perpendicular = perpendicular * -1.0f;
 
             // Start broadside approach at 1.2x firing range
-            float broadsideStartDist = Config::maxCrosshairDistance * 1.2f * personalityFactor;
+            float broadsideStartDist = config.maxCrosshairDistance * 1.2f * personalityFactor;
 
             if (dist < idealDist - tolerance)
             {
@@ -332,7 +332,7 @@ void AIController::avoidEdges (const Ship& myShip, float arenaWidth, float arena
     float shipLength = myShip.getLength();
 
     // Look ahead based on speed
-    float lookAheadTime = Config::aiLookAheadTime;
+    float lookAheadTime = config.aiLookAheadTime;
     Vec2 futurePos = pos + vel * lookAheadTime;
 
     float dangerMargin = shipLength * 2.0f + speed * 1.5f;
@@ -375,7 +375,7 @@ void AIController::avoidEdges (const Ship& myShip, float arenaWidth, float arena
 bool AIController::isNearEdge (const Ship& myShip, float arenaWidth, float arenaHeight)
 {
     Vec2 pos = myShip.getPosition();
-    float margin = Config::aiWanderMargin;
+    float margin = config.aiWanderMargin;
     return pos.x < margin || pos.x > arenaWidth - margin ||
            pos.y < margin || pos.y > arenaHeight - margin;
 }
@@ -389,7 +389,7 @@ void AIController::updateAim (const Ship& myShip, const Ship* targetShip)
         Vec2 targetVel = targetShip->getVelocity();
 
         // Calculate shell speed (same formula as Ship::fireShells)
-        float shellSpeed = myShip.getMaxSpeed() * Config::shellSpeedMultiplier;
+        float shellSpeed = myShip.getMaxSpeed() * config.shellSpeedMultiplier;
 
         // Calculate distance to target
         Vec2 toTarget = targetPos - myPos;
@@ -426,8 +426,8 @@ void AIController::updateAim (const Ship& myShip, const Ship* targetShip)
             }
 
             // Fire if crosshair is close to predicted position and in range
-            fireInput = crosshairDist < Config::aiCrosshairTolerance * personalityFactor &&
-                        distance < Config::aiFireDistance * personalityFactor &&
+            fireInput = crosshairDist < config.aiCrosshairTolerance * personalityFactor &&
+                        distance < config.aiFireDistance * personalityFactor &&
                         myShip.isReadyToFire();
         }
         else

@@ -36,7 +36,6 @@ private:
 
     Vec2 wanderTarget;
     float wanderTimer = 0.0f;
-    float wanderInterval = Config::aiWanderInterval;
 
     // Personality factor (0.95 to 1.05) - makes each AI slightly different
     float personalityFactor = 1.0f;

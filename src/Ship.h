@@ -34,7 +34,7 @@ public:
     float getAngle() const                          { return angle; }
     float getLength() const                         { return length; }
     float getWidth() const                          { return width; }
-    float getMaxSpeed() const                       { return maxSpeed; }
+    float getMaxSpeed() const                       { return config.shipMaxSpeed; }
     int getPlayerIndex() const                      { return playerIndex; }
     int getTeam() const                             { return team; }  // -1=FFA, 0=team1, 1=team2
     const std::array<Turret, 4>& getTurrets() const { return turrets; }
@@ -42,18 +42,18 @@ public:
     void setCrosshairPosition (Vec2 worldPos);  // For mouse aiming
     const std::vector<Bubble>& getBubbles() const   { return bubbles; }
     const std::vector<Smoke>& getSmoke() const      { return smoke; }
-    float getDamagePercent() const                  { return 1.0f - (health / maxHealth); }
+    float getDamagePercent() const                  { return 1.0f - (health / config.shipMaxHealth); }
     std::vector<Shell>& getPendingShells()          { return pendingShells; }
     Color getColor() const;
 
     // Health system
     float getHealth() const         { return health; }
-    float getMaxHealth() const      { return maxHealth; }
+    float getMaxHealth() const      { return config.shipMaxHealth; }
     bool isAlive() const            { return health > 0; }
     bool isVisible() const          { return isAlive() || isSinking(); }
-    bool isSinking() const          { return sinking && sinkTimer < Config::shipSinkDuration; }
-    bool isFullySunk() const        { return sinking && sinkTimer >= Config::shipSinkDuration; }
-    float getSinkProgress() const   { return sinking ? sinkTimer / Config::shipSinkDuration : 0.0f; }
+    bool isSinking() const          { return sinking && sinkTimer < config.shipSinkDuration; }
+    bool isFullySunk() const        { return sinking && sinkTimer >= config.shipSinkDuration; }
+    float getSinkProgress() const   { return sinking ? sinkTimer / config.shipSinkDuration : 0.0f; }
     void takeDamage (float damage);
 
     // Collision
@@ -66,9 +66,9 @@ public:
     float getThrottle() const       { return throttle; }
     float getRudder() const         { return rudder; }
     float getCrosshairDistance() const; // Distance from ship to crosshair
-    float getReloadProgress() const { return 1.0f - (fireTimer / Config::fireInterval); }
+    float getReloadProgress() const { return 1.0f - (fireTimer / config.fireInterval); }
     bool isReadyToFire() const; // True if reloaded AND turrets on target AND in range
-    bool isCrosshairInRange() const { return crosshairOffset.length() >= Config::minShellRange; }
+    bool isCrosshairInRange() const { return crosshairOffset.length() >= config.minShellRange; }
 
 private:
     int playerIndex;
@@ -80,7 +80,6 @@ private:
 
     float length;
     float width;
-    float maxSpeed = Config::shipMaxSpeed;
 
     float throttle = 0.0f; // -1 to 1 (current throttle position)
     float rudder = 0.0f; // -1 to 1 (current rudder position)
@@ -96,8 +95,7 @@ private:
     float smokeSpawnTimer = 0.0f;
 
     // Health
-    float health = Config::shipMaxHealth;
-    float maxHealth = Config::shipMaxHealth;
+    float health = config.shipMaxHealth;
 
     // Sinking
     bool sinking = false;

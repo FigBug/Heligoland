@@ -222,14 +222,14 @@ void Game::startGame()
     explosions.clear();
     winnerIndex = -1;
     gameOverTimer = 0.0f;
-    gameStartDelay = Config::gameStartDelay;
+    gameStartDelay = config.gameStartDelay;
 
     // Initialize wind (minimum strength)
     float windAngle = ((float) rand() / RAND_MAX) * 2.0f * pi;
-    float windStrength = Config::windMinStrength + ((float) rand() / RAND_MAX) * (1.0f - Config::windMinStrength);
+    float windStrength = config.windMinStrength + ((float) rand() / RAND_MAX) * (1.0f - config.windMinStrength);
     wind = Vec2::fromAngle (windAngle) * windStrength;
     targetWind = wind;
-    windChangeTimer = Config::windChangeInterval;
+    windChangeTimer = config.windChangeInterval;
 
     state = GameState::Playing;
 }
@@ -242,21 +242,21 @@ void Game::updateWind (float dt)
     {
         // Pick new target wind - minor adjustment from current wind
         float currentAngle = std::atan2 (wind.y, wind.x);
-        float angleChange = ((float) rand() / RAND_MAX - 0.5f) * Config::windAngleChangeMax * 2.0f;
+        float angleChange = ((float) rand() / RAND_MAX - 0.5f) * config.windAngleChangeMax * 2.0f;
         float newAngle = currentAngle + angleChange;
 
         // Small strength change, minimum strength enforced
         float currentStrength = wind.length();
-        float strengthChange = ((float) rand() / RAND_MAX - 0.5f) * Config::windStrengthChangeMax;
-        float newStrength = std::clamp (currentStrength + strengthChange, Config::windMinStrength, 1.0f);
+        float strengthChange = ((float) rand() / RAND_MAX - 0.5f) * config.windStrengthChangeMax;
+        float newStrength = std::clamp (currentStrength + strengthChange, config.windMinStrength, 1.0f);
 
         targetWind = Vec2::fromAngle (newAngle) * newStrength;
-        windChangeTimer = Config::windChangeInterval;
+        windChangeTimer = config.windChangeInterval;
     }
 
     // Slowly lerp wind toward target
-    wind.x += (targetWind.x - wind.x) * Config::windLerpSpeed * dt;
-    wind.y += (targetWind.y - wind.y) * Config::windLerpSpeed * dt;
+    wind.x += (targetWind.x - wind.x) * config.windLerpSpeed * dt;
+    wind.y += (targetWind.y - wind.y) * config.windLerpSpeed * dt;
 }
 
 void Game::updatePlaying (float dt)
@@ -342,7 +342,7 @@ void Game::updatePlaying (float dt)
             }
         }
         float avgThrottle = aliveCount > 0 ? totalThrottle / aliveCount : 0.0f;
-        audio->setEngineVolume (Config::audioEngineBaseVolume + avgThrottle * Config::audioEngineThrottleBoost);
+        audio->setEngineVolume (config.audioEngineBaseVolume + avgThrottle * config.audioEngineThrottleBoost);
     }
 
     // Update shells
@@ -387,6 +387,8 @@ void Game::updateGameOver (float dt)
             Explosion splash;
             splash.position = shell.getPosition();
             splash.isHit = false;
+            splash.duration = config.explosionDuration;
+            splash.maxRadius = config.explosionMaxRadius;
             explosions.push_back (splash);
             shell.kill();
         }
@@ -403,7 +405,7 @@ void Game::updateGameOver (float dt)
         explosions.end());
 
     gameOverTimer += dt;
-    if (gameOverTimer >= Config::gameOverReturnDelay)
+    if (gameOverTimer >= config.gameOverReturnDelay)
     {
         returnToTitle();
     }
@@ -424,8 +426,8 @@ void Game::returnToTitle()
 void Game::updateShells (float dt)
 {
     // Calculate wind drift force based on shell speed and max wind drift
-    float shellSpeed = Config::shipMaxSpeed * Config::shellSpeedMultiplier;
-    Vec2 windDrift = wind * shellSpeed * Config::windMaxDrift;
+    float shellSpeed = config.shipMaxSpeed * config.shellSpeedMultiplier;
+    Vec2 windDrift = wind * shellSpeed * config.windMaxDrift;
 
     for (auto& shell : shells)
     {
@@ -466,12 +468,14 @@ void Game::checkCollisions()
                 float arenaWidth, arenaHeight;
                 getWindowSize (arenaWidth, arenaHeight);
 
-                ship->takeDamage (Config::shellDamage);
+                ship->takeDamage (config.shellDamage);
 
                 // Spawn hit explosion
                 Explosion explosion;
                 explosion.position = shell.getPosition();
                 explosion.isHit = true;
+                explosion.duration = config.explosionDuration;
+                explosion.maxRadius = config.explosionMaxRadius;
                 explosions.push_back (explosion);
 
                 // Play explosion sound
@@ -485,8 +489,8 @@ void Game::checkCollisions()
                     Explosion sinkExplosion;
                     sinkExplosion.position = ship->getPosition();
                     sinkExplosion.isHit = true;
-                    sinkExplosion.maxRadius = Config::sinkExplosionMaxRadius;
-                    sinkExplosion.duration = Config::sinkExplosionDuration;
+                    sinkExplosion.maxRadius = config.sinkExplosionMaxRadius;
+                    sinkExplosion.duration = config.sinkExplosionDuration;
                     explosions.push_back (sinkExplosion);
                 }
 
@@ -505,6 +509,8 @@ void Game::checkCollisions()
             Explosion splash;
             splash.position = shell.getPosition();
             splash.isHit = false;
+            splash.duration = config.explosionDuration;
+            splash.maxRadius = config.explosionMaxRadius;
             explosions.push_back (splash);
 
             // Play splash sound
@@ -600,12 +606,12 @@ void Game::checkCollisions()
                 float impactSpeed = relVel.length();
 
                 // Damage proportional to impact speed
-                float damage = impactSpeed * Config::collisionDamageScale;
+                float damage = impactSpeed * config.collisionDamageScale;
                 ships[i]->takeDamage (damage);
                 ships[j]->takeDamage (damage);
 
                 // Play collision sound at collision point
-                if (audio && impactSpeed > Config::aiMinImpactForSound)
+                if (audio && impactSpeed > config.aiMinImpactForSound)
                 {
                     float arenaWidth, arenaHeight;
                     getWindowSize (arenaWidth, arenaHeight);
@@ -735,7 +741,7 @@ void Game::renderTitle()
     getWindowSize (w, h);
 
     // Draw title
-    renderer->drawTextCentered ("HELIGOLAND", { w / 2.0f, h / 3.0f }, 8.0f, Config::colorTitle);
+    renderer->drawTextCentered ("HELIGOLAND", { w / 2.0f, h / 3.0f }, 8.0f, config.colorTitle);
 
     // Draw connected players
     int connectedCount = 0;
@@ -748,7 +754,7 @@ void Game::renderTitle()
     }
 
     std::string playerText = std::to_string (connectedCount) + " PLAYERS CONNECTED";
-    renderer->drawTextCentered (playerText, { w / 2.0f, h * 0.45f }, 3.0f, Config::colorSubtitle);
+    renderer->drawTextCentered (playerText, { w / 2.0f, h * 0.45f }, 3.0f, config.colorSubtitle);
 
     // Draw game mode selector
     std::string modeText;
@@ -762,9 +768,9 @@ void Game::renderTitle()
         modeText = "1 VS 1 VS 1";
     else
         modeText = "BATTLE 6 VS 6";
-    renderer->drawTextCentered (modeText, { w / 2.0f, h * 0.55f }, 4.0f, Config::colorModeText);
+    renderer->drawTextCentered (modeText, { w / 2.0f, h * 0.55f }, 4.0f, config.colorModeText);
 
-    renderer->drawTextCentered ("LEFT - RIGHT TO CHANGE MODE", { w / 2.0f, h * 0.62f }, 1.5f, Config::colorGreySubtle);
+    renderer->drawTextCentered ("LEFT - RIGHT TO CHANGE MODE", { w / 2.0f, h * 0.62f }, 1.5f, config.colorGreySubtle);
 
     // Draw player slots (only show human-controllable slots)
     int numSlots = (gameMode == GameMode::Battle) ? MAX_PLAYERS : getNumShipsForMode();
@@ -778,47 +784,47 @@ void Game::renderTitle()
         float startX = w / 2.0f - teamSpacing / 2.0f - slotSpacing / 2.0f;
 
         // Team 1 slots (players 0, 1)
-        renderer->drawTextCentered ("TEAM 1", { startX + slotSpacing / 2.0f, slotY - 45.0f }, 2.0f, Config::colorShipRed);
+        renderer->drawTextCentered ("TEAM 1", { startX + slotSpacing / 2.0f, slotY - 45.0f }, 2.0f, config.colorShipRed);
         for (int i = 0; i < 2; ++i)
         {
             Vec2 slotPos = { startX + i * slotSpacing, slotY };
             if (players[i]->isConnected())
             {
-                Color slotColor = (i == 0) ? Config::colorShipRed : Config::colorShipBlue;
+                Color slotColor = (i == 0) ? config.colorShipRed : config.colorShipBlue;
                 renderer->drawFilledRect ({ slotPos.x - 25, slotPos.y - 25 }, 50, 50, slotColor);
-                renderer->drawTextCentered ("P" + std::to_string (i + 1), slotPos, 3.0f, Config::colorBlack);
+                renderer->drawTextCentered ("P" + std::to_string (i + 1), slotPos, 3.0f, config.colorBlack);
             }
             else
             {
-                renderer->drawRect ({ slotPos.x - 25, slotPos.y - 25 }, 50, 50, Config::colorGreyDark);
-                renderer->drawTextCentered ("AI", slotPos, 2.0f, Config::colorGreyDark);
+                renderer->drawRect ({ slotPos.x - 25, slotPos.y - 25 }, 50, 50, config.colorGreyDark);
+                renderer->drawTextCentered ("AI", slotPos, 2.0f, config.colorGreyDark);
             }
         }
 
         // Team 2 slots (players 2, 3)
         float team2StartX = w / 2.0f + teamSpacing / 2.0f - slotSpacing / 2.0f;
-        renderer->drawTextCentered ("TEAM 2", { team2StartX + slotSpacing / 2.0f, slotY - 45.0f }, 2.0f, Config::colorShipBlue);
+        renderer->drawTextCentered ("TEAM 2", { team2StartX + slotSpacing / 2.0f, slotY - 45.0f }, 2.0f, config.colorShipBlue);
         for (int i = 2; i < 4; ++i)
         {
             Vec2 slotPos = { team2StartX + (i - 2) * slotSpacing, slotY };
             if (players[i]->isConnected())
             {
-                Color slotColor = (i == 2) ? Config::colorShipGreen : Config::colorShipYellow;
+                Color slotColor = (i == 2) ? config.colorShipGreen : config.colorShipYellow;
                 renderer->drawFilledRect ({ slotPos.x - 25, slotPos.y - 25 }, 50, 50, slotColor);
-                renderer->drawTextCentered ("P" + std::to_string (i + 1), slotPos, 3.0f, Config::colorBlack);
+                renderer->drawTextCentered ("P" + std::to_string (i + 1), slotPos, 3.0f, config.colorBlack);
             }
             else
             {
-                renderer->drawRect ({ slotPos.x - 25, slotPos.y - 25 }, 50, 50, Config::colorGreyDark);
-                renderer->drawTextCentered ("AI", slotPos, 2.0f, Config::colorGreyDark);
+                renderer->drawRect ({ slotPos.x - 25, slotPos.y - 25 }, 50, 50, config.colorGreyDark);
+                renderer->drawTextCentered ("AI", slotPos, 2.0f, config.colorGreyDark);
             }
         }
 
         if (gameMode == GameMode::Battle)
         {
             // Show "+4 AI" indicators for each team
-            renderer->drawTextCentered ("+4 AI", { startX + slotSpacing / 2.0f, slotY + 45.0f }, 1.5f, Config::colorGreySubtle);
-            renderer->drawTextCentered ("+4 AI", { team2StartX + slotSpacing / 2.0f, slotY + 45.0f }, 1.5f, Config::colorGreySubtle);
+            renderer->drawTextCentered ("+4 AI", { startX + slotSpacing / 2.0f, slotY + 45.0f }, 1.5f, config.colorGreySubtle);
+            renderer->drawTextCentered ("+4 AI", { team2StartX + slotSpacing / 2.0f, slotY + 45.0f }, 1.5f, config.colorGreySubtle);
         }
     }
     else
@@ -836,27 +842,27 @@ void Game::renderTitle()
                 switch (i)
                 {
                     case 0:
-                        slotColor = Config::colorShipRed;
+                        slotColor = config.colorShipRed;
                         break;
                     case 1:
-                        slotColor = Config::colorShipBlue;
+                        slotColor = config.colorShipBlue;
                         break;
                     case 2:
-                        slotColor = Config::colorShipGreen;
+                        slotColor = config.colorShipGreen;
                         break;
                     case 3:
-                        slotColor = Config::colorShipYellow;
+                        slotColor = config.colorShipYellow;
                         break;
                     default:
-                        slotColor = Config::colorGrey;
+                        slotColor = config.colorGrey;
                         break;
                 }
                 renderer->drawFilledRect ({ slotPos.x - 25, slotPos.y - 25 }, 50, 50, slotColor);
-                renderer->drawTextCentered ("P" + std::to_string (i + 1), slotPos, 3.0f, Config::colorBlack);
+                renderer->drawTextCentered ("P" + std::to_string (i + 1), slotPos, 3.0f, config.colorBlack);
             }
             else
             {
-                slotColor = Config::colorGreyDark;
+                slotColor = config.colorGreyDark;
                 renderer->drawRect ({ slotPos.x - 25, slotPos.y - 25 }, 50, 50, slotColor);
                 renderer->drawTextCentered ("AI", slotPos, 2.0f, slotColor);
             }
@@ -867,12 +873,12 @@ void Game::renderTitle()
     if (audio)
     {
         std::string volumeText = "VOLUME: " + std::to_string (audio->getMasterVolumeLevel());
-        renderer->drawTextCentered (volumeText, { w / 2.0f, h * 0.82f }, 2.5f, Config::colorSubtitle);
-        renderer->drawTextCentered ("UP - DOWN TO CHANGE VOLUME", { w / 2.0f, h * 0.87f }, 1.5f, Config::colorGreySubtle);
+        renderer->drawTextCentered (volumeText, { w / 2.0f, h * 0.82f }, 2.5f, config.colorSubtitle);
+        renderer->drawTextCentered ("UP - DOWN TO CHANGE VOLUME", { w / 2.0f, h * 0.87f }, 1.5f, config.colorGreySubtle);
     }
 
     // Draw start instruction
-    renderer->drawTextCentered ("CLICK OR PRESS ANY BUTTON TO START", { w / 2.0f, h * 0.94f }, 2.0f, Config::colorInstruction);
+    renderer->drawTextCentered ("CLICK OR PRESS ANY BUTTON TO START", { w / 2.0f, h * 0.94f }, 2.0f, config.colorInstruction);
 }
 
 void Game::renderPlaying()
@@ -980,22 +986,22 @@ void Game::renderPlaying()
         std::string team2Text = std::to_string (team2Alive);
 
         // Draw on left and right sides of screen
-        renderer->drawTextCentered (team1Text, { 50.0f, h / 2.0f }, 6.0f, Config::colorTeam1);
-        renderer->drawTextCentered (team2Text, { w - 50.0f, h / 2.0f }, 6.0f, Config::colorTeam2);
+        renderer->drawTextCentered (team1Text, { 50.0f, h / 2.0f }, 6.0f, config.colorTeam1);
+        renderer->drawTextCentered (team2Text, { w - 50.0f, h / 2.0f }, 6.0f, config.colorTeam2);
     }
 }
 
 void Game::renderGameOver()
 {
     // Wait before showing text so player can see the final explosion
-    if (gameOverTimer < Config::gameOverTextDelay)
+    if (gameOverTimer < config.gameOverTextDelay)
         return;
 
     float w, h;
     getWindowSize (w, h);
 
-    Color textColor = Config::colorWhite;
-    Color statsColor = Config::colorSubtitle;
+    Color textColor = config.colorWhite;
+    Color statsColor = config.colorSubtitle;
 
     if (winnerIndex >= 0)
     {

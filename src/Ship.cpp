@@ -14,7 +14,7 @@ Ship::Ship (int playerIndex_, Vec2 startPos, float startAngle, float shipLength,
       } }
 {
     // Start crosshair in front of ship
-    crosshairOffset = Vec2::fromAngle (angle) * Config::crosshairStartDistance;
+    crosshairOffset = Vec2::fromAngle (angle) * config.crosshairStartDistance;
 }
 
 void Ship::update (float dt, Vec2 moveInput, Vec2 aimInput, bool fireInput, float arenaWidth, float arenaHeight, Vec2 wind)
@@ -23,12 +23,12 @@ void Ship::update (float dt, Vec2 moveInput, Vec2 aimInput, bool fireInput, floa
     if (isSinking())
     {
         sinkTimer += dt;
-        if (sinkTimer > Config::shipSinkDuration)
-            sinkTimer = Config::shipSinkDuration; // Cap to prevent alpha wraparound
+        if (sinkTimer > config.shipSinkDuration)
+            sinkTimer = config.shipSinkDuration; // Cap to prevent alpha wraparound
 
         // Slow down while sinking
-        velocity *= Config::shipSinkVelocityDecay;
-        angularVelocity *= Config::shipSinkAngularDecay;
+        velocity *= config.shipSinkVelocityDecay;
+        angularVelocity *= config.shipSinkAngularDecay;
         
         // Update position
         position += velocity * dt;
@@ -44,7 +44,7 @@ void Ship::update (float dt, Vec2 moveInput, Vec2 aimInput, bool fireInput, floa
 
     // Calculate damage penalty (up to configured reduction in speed and turning)
     float damagePercent = getDamagePercent();
-    float damagePenalty = 1.0f - (damagePercent * Config::shipDamagePenaltyMax);
+    float damagePenalty = 1.0f - (damagePercent * config.shipDamagePenaltyMax);
 
     // Update fire timer
     if (fireTimer > 0)
@@ -54,14 +54,14 @@ void Ship::update (float dt, Vec2 moveInput, Vec2 aimInput, bool fireInput, floa
     if (fireInput && fireTimer <= 0)
     {
         fireShells();
-        fireTimer = Config::fireInterval;
+        fireTimer = config.fireInterval;
     }
 
     // Y-axis adjusts throttle (forward/back on stick increases/decreases)
     float throttleInput = -moveInput.y; // Negative because stick up is negative
     if (std::abs (throttleInput) > 0.1f)
     {
-        throttle += throttleInput * Config::shipThrottleRate * dt;
+        throttle += throttleInput * config.shipThrottleRate * dt;
         throttle = std::clamp (throttle, -1.0f, 1.0f);
     }
 
@@ -70,7 +70,7 @@ void Ship::update (float dt, Vec2 moveInput, Vec2 aimInput, bool fireInput, floa
     if (std::abs (rudderInput) > 0.1f)
     {
         // Apply rudder input
-        rudder += rudderInput * Config::shipRudderRate * dt;
+        rudder += rudderInput * config.shipRudderRate * dt;
         rudder = std::clamp (rudder, -1.0f, 1.0f);
     }
     else
@@ -78,13 +78,13 @@ void Ship::update (float dt, Vec2 moveInput, Vec2 aimInput, bool fireInput, floa
         // Return rudder to center
         if (rudder > 0)
         {
-            rudder -= Config::shipRudderReturn * dt;
+            rudder -= config.shipRudderReturn * dt;
             if (rudder < 0)
                 rudder = 0;
         }
         else if (rudder < 0)
         {
-            rudder += Config::shipRudderReturn * dt;
+            rudder += config.shipRudderReturn * dt;
             if (rudder > 0)
                 rudder = 0;
         }
@@ -92,15 +92,15 @@ void Ship::update (float dt, Vec2 moveInput, Vec2 aimInput, bool fireInput, floa
 
     // Apply throttle to velocity (reduced by damage)
     Vec2 forward = Vec2::fromAngle (angle);
-    float effectiveMaxSpeed = maxSpeed * damagePenalty;
+    float effectiveMaxSpeed = config.shipMaxSpeed * damagePenalty;
     float targetSpeed = throttle * effectiveMaxSpeed;
 
     // Calculate current speed with sign (positive = forward, negative = backward)
     float currentSpeed = velocity.dot (forward);
 
     // Acceleration/deceleration rate based on shipAccelTime
-    float accelRate = maxSpeed / Config::shipAccelTime;
-    float coastDecelRate = maxSpeed / Config::shipCoastStopTime;
+    float accelRate = config.shipMaxSpeed / config.shipAccelTime;
+    float coastDecelRate = config.shipMaxSpeed / config.shipCoastStopTime;
 
     // Gradually adjust speed toward target
     float speedDiff = targetSpeed - currentSpeed;
@@ -131,7 +131,7 @@ void Ship::update (float dt, Vec2 moveInput, Vec2 aimInput, bool fireInput, floa
     {
         // Turn rate based on minimum turning radius
         // radius = speed / angularVelocity, so angularVelocity = speed / radius
-        float minTurnRadius = length * Config::shipMinTurnRadiusMultiplier / damagePenalty; // Damaged ships turn wider
+        float minTurnRadius = length * config.shipMinTurnRadiusMultiplier / damagePenalty; // Damaged ships turn wider
         angularVelocity = rudder * speed / minTurnRadius;
     }
     else
@@ -156,7 +156,7 @@ void Ship::update (float dt, Vec2 moveInput, Vec2 aimInput, bool fireInput, floa
 
     // Update crosshair offset based on aim stick (moves in X/Y)
     if (aimInput.lengthSquared() > 0.01f)
-        crosshairOffset += aimInput * Config::crosshairSpeed * dt;
+        crosshairOffset += aimInput * config.crosshairSpeed * dt;
 
     // Clamp crosshair to stay on screen
     Vec2 crosshairWorldPos = position + crosshairOffset;
@@ -172,8 +172,8 @@ void Ship::update (float dt, Vec2 moveInput, Vec2 aimInput, bool fireInput, floa
 
     // Clamp crosshair to max range
     float crosshairDist = crosshairOffset.length();
-    if (crosshairDist > Config::maxCrosshairDistance)
-        crosshairOffset = crosshairOffset.normalized() * Config::maxCrosshairDistance;
+    if (crosshairDist > config.maxCrosshairDistance)
+        crosshairOffset = crosshairOffset.normalized() * config.maxCrosshairDistance;
 
     // Update turrets to aim at crosshair from their individual positions
     crosshairWorldPos = position + crosshairOffset;
@@ -249,7 +249,7 @@ Color Ship::getColor() const
     if (team >= 0)
     {
         // Team mode: single color per team
-        return (team == 0) ? Config::colorTeam1 : Config::colorTeam2;
+        return (team == 0) ? config.colorTeam1 : config.colorTeam2;
     }
     else
     {
@@ -257,15 +257,15 @@ Color Ship::getColor() const
         switch (playerIndex)
         {
             case 0:
-                return Config::colorShipRed;
+                return config.colorShipRed;
             case 1:
-                return Config::colorShipBlue;
+                return config.colorShipBlue;
             case 2:
-                return Config::colorShipGreen;
+                return config.colorShipGreen;
             case 3:
-                return Config::colorShipYellow;
+                return config.colorShipYellow;
             default:
-                return Config::colorGrey;
+                return config.colorGrey;
         }
     }
 }
@@ -294,7 +294,7 @@ void Ship::applyCollision (Vec2 pushDirection, float pushDistance, Vec2 myVel, V
     // We'll use a coefficient of restitution for energy loss
 
     Vec2 normal = pushDirection.normalized();
-    float restitution = Config::collisionRestitution;
+    float restitution = config.collisionRestitution;
 
     // Relative velocity along collision normal
     float relVelNormal = (myVel - otherVel).dot (normal);
@@ -311,7 +311,7 @@ void Ship::applyCollision (Vec2 pushDirection, float pushDistance, Vec2 myVel, V
         // Add some rotation based on where the hit occurred
         // This is simplified - just add some angular velocity
         float lateralComponent = (myVel - otherVel).dot ({ -normal.y, normal.x });
-        angularVelocity += lateralComponent * Config::collisionAngularFactor;
+        angularVelocity += lateralComponent * config.collisionAngularFactor;
     }
 }
 
@@ -347,8 +347,8 @@ void Ship::fireShells()
     float cosA = std::cos (angle);
     float sinA = std::sin (angle);
     // Use minimum range if crosshair is too close
-    float targetRange = std::max (crosshairOffset.length(), Config::minShellRange);
-    float shellSpeed = maxSpeed * Config::shellSpeedMultiplier;
+    float targetRange = std::max (crosshairOffset.length(), config.minShellRange);
+    float shellSpeed = config.shipMaxSpeed * config.shellSpeedMultiplier;
 
     for (const auto& turret : turrets)
     {
@@ -379,9 +379,9 @@ void Ship::setCrosshairPosition (Vec2 worldPos)
 
     // Clamp to max range
     float dist = crosshairOffset.length();
-    if (dist > Config::maxCrosshairDistance)
+    if (dist > config.maxCrosshairDistance)
     {
-        crosshairOffset = crosshairOffset.normalized() * Config::maxCrosshairDistance;
+        crosshairOffset = crosshairOffset.normalized() * config.maxCrosshairDistance;
     }
 }
 
@@ -406,7 +406,7 @@ bool Ship::isReadyToFire() const
 void Ship::updateBubbles (float dt)
 {
     float speed = velocity.length();
-    float fadeRate = 1.0f / Config::bubbleFadeTime;
+    float fadeRate = 1.0f / config.bubbleFadeTime;
 
     // Fade and remove old bubbles
     for (auto it = bubbles.begin(); it != bubbles.end();)
@@ -419,13 +419,13 @@ void Ship::updateBubbles (float dt)
     }
 
     // Spawn new bubbles at the rear of the ship when moving or throttle applied
-    if (isVisible() && (speed > Config::bubbleMinSpeed || (isAlive() && std::abs (throttle) > 0.1f)))
+    if (isVisible() && (speed > config.bubbleMinSpeed || (isAlive() && std::abs (throttle) > 0.1f)))
     {
         bubbleSpawnTimer += dt;
 
         // Spawn rate increases with speed (use minimum speed if just starting)
         float effectiveSpeed = std::max (speed, 1.0f);
-        float spawnRate = Config::bubbleSpawnInterval * (50.0f / effectiveSpeed);
+        float spawnRate = config.bubbleSpawnInterval * (50.0f / effectiveSpeed);
 
         while (bubbleSpawnTimer >= spawnRate)
         {
@@ -441,7 +441,7 @@ void Ship::updateBubbles (float dt)
             spawnPos += perp * perpOffset;
 
             // Random bubble size
-            float bubbleRadius = Config::bubbleMinRadius + ((float) rand() / RAND_MAX) * Config::bubbleRadiusVariation;
+            float bubbleRadius = config.bubbleMinRadius + ((float) rand() / RAND_MAX) * config.bubbleRadiusVariation;
 
             bubbles.push_back ({ spawnPos, bubbleRadius, 1.0f });
         }
@@ -450,7 +450,7 @@ void Ship::updateBubbles (float dt)
 
 void Ship::updateSmoke (float dt, Vec2 wind)
 {
-    float fadeRate = 1.0f / Config::smokeFadeTime;
+    float fadeRate = 1.0f / config.smokeFadeTime;
 
     // Update existing smoke - fade and move with wind
     for (auto it = smoke.begin(); it != smoke.end();)
@@ -464,7 +464,7 @@ void Ship::updateSmoke (float dt, Vec2 wind)
         dispersedWind.x = wind.x * cosR - wind.y * sinR;
         dispersedWind.y = wind.x * sinR + wind.y * cosR;
 
-        it->position += dispersedWind * Config::smokeWindStrength * dt;
+        it->position += dispersedWind * config.smokeWindStrength * dt;
 
         if (it->alpha <= 0.0f)
             it = smoke.erase (it);
@@ -483,7 +483,7 @@ void Ship::updateSmoke (float dt, Vec2 wind)
     smokeSpawnTimer += dt;
 
     // Base spawn interval for engine smoke, faster with damage
-    float spawnInterval = Config::smokeBaseSpawnInterval / ((1.0f + damagePercent * Config::smokeDamageMultiplier) * sinkFactor);
+    float spawnInterval = config.smokeBaseSpawnInterval / ((1.0f + damagePercent * config.smokeDamageMultiplier) * sinkFactor);
 
     while (smokeSpawnTimer >= spawnInterval)
     {
@@ -509,14 +509,14 @@ void Ship::updateSmoke (float dt, Vec2 wind)
         }
 
         // Smoke size: small wisps for undamaged, bigger with damage
-        float baseRadius = Config::smokeBaseRadius + damagePercent * 2.0f;
+        float baseRadius = config.smokeBaseRadius + damagePercent * 2.0f;
         float smokeRadius = baseRadius + ((float) rand() / RAND_MAX) * 1.5f;
 
         // Lower starting alpha for thinner smoke, reduce further when sinking
-        float startAlpha = (Config::smokeBaseAlpha + damagePercent * 0.4f) * sinkFactor;
+        float startAlpha = (config.smokeBaseAlpha + damagePercent * 0.4f) * sinkFactor;
 
         // Random wind angle offset
-        float windAngleOffset = ((float) rand() / RAND_MAX - 0.5f) * Config::smokeWindAngleVariation;
+        float windAngleOffset = ((float) rand() / RAND_MAX - 0.5f) * config.smokeWindAngleVariation;
 
         smoke.push_back ({ spawnPos, smokeRadius, startAlpha, windAngleOffset });
     }

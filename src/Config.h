@@ -1,209 +1,232 @@
 #pragma once
 
+#include "FileSystemWatcher.h"
 #include <raylib.h>
+#include <memory>
+#include <string>
 
 // =============================================================================
 // Game Configuration
 // All tweakable game constants in one place
 // =============================================================================
 
-namespace Config
+class Config : public FileSystemWatcher::Listener
 {
+public:
+    Config();
+    ~Config();
+
+    bool load();
+    bool save() const;
+    void startWatching();
+
+    // FileSystemWatcher::Listener
+    void fileChanged (const std::string& file, FileSystemWatcher::Event event) override;
+
     // -------------------------------------------------------------------------
     // Ship Physics
     // -------------------------------------------------------------------------
-    static constexpr float shipLength                  = 50.0f;
-    static constexpr float shipWidth                   = 15.0f;
-    static constexpr float shipMaxSpeed                = 7.0f;
-    static constexpr float shipFullSpeedKnots          = 20.0f;     // Display speed at max velocity
-    static constexpr float shipAccelTime               = 20.0f;     // Seconds to reach full speed or stop from full speed with throttle
-    static constexpr float shipCoastStopTime           = 30.0f;     // Seconds to stop when coasting (no throttle)
-    static constexpr float shipThrottleRate            = 0.5f;      // How fast throttle changes per second
-    static constexpr float shipRudderRate              = 2.0f;      // How fast rudder moves
-    static constexpr float shipRudderReturn            = 3.0f;      // How fast rudder returns to center
-    static constexpr float shipDragCoefficient         = 0.995f;    // Velocity multiplier when coasting
-    static constexpr float shipMinTurnRadiusMultiplier = 2.0f;      // Min turn radius = length * this
-    static constexpr float shipDamagePenaltyMax        = 0.2f;      // Max speed/turn reduction at 0% health
-    static constexpr float shipSinkDuration            = 30.0f;     // Seconds to fully sink
-    static constexpr float shipSinkVelocityDecay       = 0.98f;
-    static constexpr float shipSinkAngularDecay        = 0.95f;
+    float shipLength                  = 50.0f;
+    float shipWidth                   = 15.0f;
+    float shipMaxSpeed                = 7.0f;
+    float shipFullSpeedKnots          = 20.0f;     // Display speed at max velocity
+    float shipAccelTime               = 20.0f;     // Seconds to reach full speed or stop from full speed with throttle
+    float shipCoastStopTime           = 30.0f;     // Seconds to stop when coasting (no throttle)
+    float shipThrottleRate            = 0.5f;      // How fast throttle changes per second
+    float shipRudderRate              = 2.0f;      // How fast rudder moves
+    float shipRudderReturn            = 3.0f;      // How fast rudder returns to center
+    float shipDragCoefficient         = 0.995f;    // Velocity multiplier when coasting
+    float shipMinTurnRadiusMultiplier = 2.0f;      // Min turn radius = length * this
+    float shipDamagePenaltyMax        = 0.2f;      // Max speed/turn reduction at 0% health
+    float shipSinkDuration            = 30.0f;     // Seconds to fully sink
+    float shipSinkVelocityDecay       = 0.98f;
+    float shipSinkAngularDecay        = 0.95f;
 
     // -------------------------------------------------------------------------
     // Ship Health
     // -------------------------------------------------------------------------
-    static constexpr float shipMaxHealth               = 1000.0f;
-    static constexpr float shellDamage                 = 100.0f;
+    float shipMaxHealth               = 1000.0f;
+    float shellDamage                 = 100.0f;
 
     // -------------------------------------------------------------------------
     // Turrets
     // -------------------------------------------------------------------------
-    static constexpr float turretRotationSpeed         = 0.5f;      // Radians per second
-    static constexpr float turretRadius                = 5.0f;
-    static constexpr float turretBarrelLength          = 8.0f;
-    static constexpr float turretArcSize               = 0.75f;     // Arc = PI * this (0.75 = 135 degrees)
-    static constexpr float turretOnTargetTolerance     = 0.09f;     // Radians (~5 degrees)
+    float turretRotationSpeed         = 0.5f;      // Radians per second
+    float turretRadius                = 5.0f;
+    float turretBarrelLength          = 8.0f;
+    float turretArcSize               = 0.75f;     // Arc = PI * this (0.75 = 135 degrees)
+    float turretOnTargetTolerance     = 0.09f;     // Radians (~5 degrees)
 
     // -------------------------------------------------------------------------
     // Shells / Firing
     // -------------------------------------------------------------------------
-    static constexpr float fireInterval                = 15.0f;     // Seconds between shots
-    static constexpr float shellSpeedMultiplier        = 5.0f;      // Shell speed = ship max speed * this
-    static constexpr float shellRadius                 = 2.0f;
-    static constexpr float shellSplashRadius           = 4.0f;      // Hit detection radius when shell lands
-    static constexpr float minShellRange               = 50.0f;     // Minimum range shells can travel
+    float fireInterval                = 15.0f;     // Seconds between shots
+    float shellSpeedMultiplier        = 5.0f;      // Shell speed = ship max speed * this
+    float shellRadius                 = 2.0f;
+    float shellSplashRadius           = 4.0f;      // Hit detection radius when shell lands
+    float minShellRange               = 50.0f;     // Minimum range shells can travel
 
     // -------------------------------------------------------------------------
     // Crosshair / Aiming
     // -------------------------------------------------------------------------
-    static constexpr float crosshairSpeed              = 150.0f;    // How fast crosshair moves with stick
-    static constexpr float maxCrosshairDistance        = 300.0f;
-    static constexpr float crosshairStartDistance      = 150.0f;    // Initial crosshair distance
+    float crosshairSpeed              = 150.0f;    // How fast crosshair moves with stick
+    float maxCrosshairDistance        = 300.0f;
+    float crosshairStartDistance      = 150.0f;    // Initial crosshair distance
 
     // -------------------------------------------------------------------------
     // Bubbles (Wake Trail)
     // -------------------------------------------------------------------------
-    static constexpr float bubbleMinSpeed              = 0.5f;      // Min ship speed to spawn bubbles
-    static constexpr float bubbleSpawnInterval         = 0.02f;
-    static constexpr float bubbleFadeTime              = 10.0f;     // Seconds to fade out
-    static constexpr float bubbleMinRadius             = 1.5f;
-    static constexpr float bubbleRadiusVariation       = 2.0f;      // Random addition to min radius
+    float bubbleMinSpeed              = 0.5f;      // Min ship speed to spawn bubbles
+    float bubbleSpawnInterval         = 0.02f;
+    float bubbleFadeTime              = 10.0f;     // Seconds to fade out
+    float bubbleMinRadius             = 1.5f;
+    float bubbleRadiusVariation       = 2.0f;      // Random addition to min radius
 
     // -------------------------------------------------------------------------
     // Smoke
     // -------------------------------------------------------------------------
-    static constexpr float smokeFadeTime               = 10.0f;     // Seconds to fade out
-    static constexpr float smokeWindStrength           = 30.0f;     // How much wind affects smoke
-    static constexpr float smokeBaseSpawnInterval      = 0.0433f;   // ~30 per second when undamaged
-    static constexpr float smokeDamageMultiplier       = 4.0f;      // Spawn rate increases with damage
-    static constexpr float smokeBaseRadius             = 1.5f;
-    static constexpr float smokeBaseAlpha              = 0.4f;
-    static constexpr float smokeWindAngleVariation     = 0.2f;    // +/- radians (~6 degrees)
-    static constexpr unsigned char smokeGreyStart      = 80;        // Grey value when not sinking
-    static constexpr unsigned char smokeGreyEnd        = 140;       // Grey value when fully sunk
+    float smokeFadeTime               = 10.0f;     // Seconds to fade out
+    float smokeWindStrength           = 30.0f;     // How much wind affects smoke
+    float smokeBaseSpawnInterval      = 0.0433f;   // ~30 per second when undamaged
+    float smokeDamageMultiplier       = 4.0f;      // Spawn rate increases with damage
+    float smokeBaseRadius             = 1.5f;
+    float smokeBaseAlpha              = 0.4f;
+    float smokeWindAngleVariation     = 0.2f;      // +/- radians (~6 degrees)
+    unsigned char smokeGreyStart      = 80;        // Grey value when not sinking
+    unsigned char smokeGreyEnd        = 140;       // Grey value when fully sunk
 
     // -------------------------------------------------------------------------
     // Explosions
     // -------------------------------------------------------------------------
-    static constexpr float explosionDuration           = 0.5f;
-    static constexpr float explosionMaxRadius          = 30.0f;
-    static constexpr float sinkExplosionDuration       = 1.0f;
-    static constexpr float sinkExplosionMaxRadius      = 80.0f;
+    float explosionDuration           = 0.5f;
+    float explosionMaxRadius          = 30.0f;
+    float sinkExplosionDuration       = 1.0f;
+    float sinkExplosionMaxRadius      = 80.0f;
 
     // -------------------------------------------------------------------------
     // Wind
     // -------------------------------------------------------------------------
-    static constexpr float windChangeInterval          = 60.0f;     // Seconds between wind target changes
-    static constexpr float windLerpSpeed               = 0.05f;     // How fast wind changes
-    static constexpr float windMaxDrift                = 0.02f;     // Max shell drift (1%)
-    static constexpr float windMinStrength             = 0.25f;     // Minimum wind strength
-    static constexpr float windAngleChangeMax          = 0.524f;    // Max angle change (~30 degrees)
-    static constexpr float windStrengthChangeMax       = 0.4f;      // Max strength change
+    float windChangeInterval          = 60.0f;     // Seconds between wind target changes
+    float windLerpSpeed               = 0.05f;     // How fast wind changes
+    float windMaxDrift                = 0.02f;     // Max shell drift (1%)
+    float windMinStrength             = 0.25f;     // Minimum wind strength
+    float windAngleChangeMax          = 0.524f;    // Max angle change (~30 degrees)
+    float windStrengthChangeMax       = 0.4f;      // Max strength change
 
     // -------------------------------------------------------------------------
     // Collision
     // -------------------------------------------------------------------------
-    static constexpr float collisionRestitution        = 0.5f;      // Bounciness (0 = inelastic, 1 = elastic)
-    static constexpr float collisionAngularFactor      = 0.01f;     // How much collisions affect rotation
-    static constexpr float collisionDamageScale        = 35.7f;     // Two full-speed ships colliding = 5 shell impacts
-    static constexpr float wallBounceMultiplier        = 0.3f;      // Velocity retained after hitting wall
+    float collisionRestitution        = 0.5f;      // Bounciness (0 = inelastic, 1 = elastic)
+    float collisionAngularFactor      = 0.01f;     // How much collisions affect rotation
+    float collisionDamageScale        = 35.7f;     // Two full-speed ships colliding = 5 shell impacts
+    float wallBounceMultiplier        = 0.3f;      // Velocity retained after hitting wall
 
     // -------------------------------------------------------------------------
     // AI
     // -------------------------------------------------------------------------
-    static constexpr float aiWanderInterval            = 3.0f;      // Base seconds between wander targets
-    static constexpr float aiWanderMargin              = 150.0f;    // Keep this far from edges
-    static constexpr float aiLookAheadTime             = 2.0f;      // Seconds to predict ahead
-    static constexpr float aiFireDistance              = 400.0f;    // Max range AI will try to fire
-    static constexpr float aiCrosshairTolerance        = 30.0f;     // How close crosshair needs to be to fire
-    static constexpr float aiMinImpactForSound         = 10.0f;     // Min collision speed for sound
+    float aiWanderInterval            = 3.0f;      // Base seconds between wander targets
+    float aiWanderMargin              = 150.0f;    // Keep this far from edges
+    float aiLookAheadTime             = 2.0f;      // Seconds to predict ahead
+    float aiFireDistance              = 400.0f;    // Max range AI will try to fire
+    float aiCrosshairTolerance        = 30.0f;     // How close crosshair needs to be to fire
+    float aiMinImpactForSound         = 10.0f;     // Min collision speed for sound
 
     // -------------------------------------------------------------------------
     // Audio
     // -------------------------------------------------------------------------
-    static constexpr float audioGunSilenceDuration     = 0.25f;     // Seconds between gun sounds
-    static constexpr float audioPitchVariation         = 0.1f;      // +/- 10%
-    static constexpr float audioGainVariation          = 0.1f;      // +/- 10%
-    static constexpr float audioEngineBaseVolume       = 0.3f;
-    static constexpr float audioEngineThrottleBoost    = 0.7f;
+    float audioGunSilenceDuration     = 0.25f;     // Seconds between gun sounds
+    float audioPitchVariation         = 0.1f;      // +/- 10%
+    float audioGainVariation          = 0.1f;      // +/- 10%
+    float audioEngineBaseVolume       = 0.3f;
+    float audioEngineThrottleBoost    = 0.7f;
 
     // -------------------------------------------------------------------------
     // Game Flow
     // -------------------------------------------------------------------------
-    static constexpr float gameStartDelay              = 0.5f;      // Ignore fire input for this long
-    static constexpr float gameOverTextDelay           = 5.0f;      // Delay before showing winner text
-    static constexpr float gameOverReturnDelay         = 8.0f;      // Total delay before returning to title
+    float gameStartDelay              = 0.5f;      // Ignore fire input for this long
+    float gameOverTextDelay           = 5.0f;      // Delay before showing winner text
+    float gameOverReturnDelay         = 8.0f;      // Total delay before returning to title
 
     // -------------------------------------------------------------------------
     // Colors - Environment
     // -------------------------------------------------------------------------
-    static constexpr Color colorOcean                  = { 30, 60, 90, 255 };
-    static constexpr Color colorWaterHighlight1        = { 255, 255, 255, 30 };
-    static constexpr Color colorWaterHighlight2        = { 220, 220, 255, 20 };
-    static constexpr Color colorWaterHighlight3        = { 180, 200, 220, 12 };
+    Color colorOcean                  = { 30, 60, 90, 255 };
+    Color colorWaterHighlight1        = { 255, 255, 255, 30 };
+    Color colorWaterHighlight2        = { 220, 220, 255, 20 };
+    Color colorWaterHighlight3        = { 180, 200, 220, 12 };
 
     // -------------------------------------------------------------------------
     // Colors - Ships (FFA mode)
     // -------------------------------------------------------------------------
-    static constexpr Color colorShipRed                = { 255, 100, 100, 255 };
-    static constexpr Color colorShipBlue               = { 100, 100, 255, 255 };
-    static constexpr Color colorShipGreen              = { 100, 255, 100, 255 };
-    static constexpr Color colorShipYellow             = { 255, 255, 100, 255 };
+    Color colorShipRed                = { 255, 100, 100, 255 };
+    Color colorShipBlue               = { 100, 100, 255, 255 };
+    Color colorShipGreen              = { 100, 255, 100, 255 };
+    Color colorShipYellow             = { 255, 255, 100, 255 };
 
     // -------------------------------------------------------------------------
     // Colors - Ships (Team mode)
     // -------------------------------------------------------------------------
-    static constexpr Color colorTeam1                  = { 255, 100, 100, 255 }; // Red
-    static constexpr Color colorTeam2                  = { 100, 100, 255, 255 }; // Blue
+    Color colorTeam1                  = { 255, 100, 100, 255 }; // Red
+    Color colorTeam2                  = { 100, 100, 255, 255 }; // Blue
 
     // -------------------------------------------------------------------------
     // Colors - UI
     // -------------------------------------------------------------------------
-    static constexpr Color colorWhite                  = { 255, 255, 255, 255 };
-    static constexpr Color colorBlack                  = { 0, 0, 0, 255 };
-    static constexpr Color colorGrey                   = { 200, 200, 200, 255 };
-    static constexpr Color colorGreyDark               = { 80, 80, 80, 255 };
-    static constexpr Color colorGreyMid                = { 100, 100, 100, 255 };
-    static constexpr Color colorGreyLight              = { 150, 150, 150, 255 };
-    static constexpr Color colorGreySubtle             = { 120, 120, 120, 255 };
-    static constexpr Color colorBarBackground          = { 60, 60, 60, 255 };
-    static constexpr Color colorHudBackground          = { 30, 30, 30, 200 };
+    Color colorWhite                  = { 255, 255, 255, 255 };
+    Color colorBlack                  = { 0, 0, 0, 255 };
+    Color colorGrey                   = { 200, 200, 200, 255 };
+    Color colorGreyDark               = { 80, 80, 80, 255 };
+    Color colorGreyMid                = { 100, 100, 100, 255 };
+    Color colorGreyLight              = { 150, 150, 150, 255 };
+    Color colorGreySubtle             = { 120, 120, 120, 255 };
+    Color colorBarBackground          = { 60, 60, 60, 255 };
+    Color colorHudBackground          = { 30, 30, 30, 200 };
 
     // -------------------------------------------------------------------------
     // Colors - Title Screen
     // -------------------------------------------------------------------------
-    static constexpr Color colorTitle                  = { 255, 255, 255, 255 };
-    static constexpr Color colorSubtitle               = { 200, 200, 200, 255 };
-    static constexpr Color colorModeText               = { 255, 220, 100, 255 };
-    static constexpr Color colorInstruction            = { 150, 150, 150, 255 };
+    Color colorTitle                  = { 255, 255, 255, 255 };
+    Color colorSubtitle               = { 200, 200, 200, 255 };
+    Color colorModeText               = { 255, 220, 100, 255 };
+    Color colorInstruction            = { 150, 150, 150, 255 };
 
     // -------------------------------------------------------------------------
     // Colors - Gameplay
     // -------------------------------------------------------------------------
-    static constexpr Color colorShell                  = { 255, 60, 40, 255 };
-    static constexpr float shellTrailLength            = 20.0f;
-    static constexpr int shellTrailSegments            = 5;
-    static constexpr Color colorBubble                 = { 255, 255, 255, 128 };
-    static constexpr Color colorBarrel                 = { 50, 50, 50, 255 };
-    static constexpr Color colorReloadReady            = { 100, 255, 100, 255 };
-    static constexpr Color colorReloadNotReady         = { 255, 100, 100, 255 };
-    static constexpr Color colorFiringRange            = { 255, 255, 255, 5 }; 
-    static constexpr Color colorThrottleBar            = { 100, 150, 255, 255 };
-    static constexpr Color colorRudderBar              = { 255, 200, 100, 255 };
+    Color colorShell                  = { 255, 60, 40, 255 };
+    float shellTrailLength            = 20.0f;
+    int shellTrailSegments            = 5;
+    Color colorBubble                 = { 255, 255, 255, 128 };
+    Color colorBarrel                 = { 50, 50, 50, 255 };
+    Color colorReloadReady            = { 100, 255, 100, 255 };
+    Color colorReloadNotReady         = { 255, 100, 100, 255 };
+    Color colorFiringRange            = { 255, 255, 255, 5 };
+    Color colorThrottleBar            = { 100, 150, 255, 255 };
+    Color colorRudderBar              = { 255, 200, 100, 255 };
 
     // -------------------------------------------------------------------------
     // Colors - Explosions
     // -------------------------------------------------------------------------
-    static constexpr Color colorExplosionOuter         = { 255, 150, 50, 200 };
-    static constexpr Color colorExplosionMid           = { 255, 220, 100, 180 };
-    static constexpr Color colorExplosionCore          = { 255, 255, 200, 150 };
-    static constexpr Color colorSplashOuter            = { 100, 150, 255, 200 };
-    static constexpr Color colorSplashMid              = { 150, 200, 255, 180 };
-    static constexpr Color colorSplashCore             = { 220, 240, 255, 150 };
+    Color colorExplosionOuter         = { 255, 150, 50, 200 };
+    Color colorExplosionMid           = { 255, 220, 100, 180 };
+    Color colorExplosionCore          = { 255, 255, 200, 150 };
+    Color colorSplashOuter            = { 100, 150, 255, 200 };
+    Color colorSplashMid              = { 150, 200, 255, 180 };
+    Color colorSplashCore             = { 220, 240, 255, 150 };
 
     // -------------------------------------------------------------------------
     // Colors - Wind Indicator
     // -------------------------------------------------------------------------
-    static constexpr Color colorWindBackground         = { 30, 30, 30, 200 };
-    static constexpr Color colorWindBorder             = { 100, 100, 100, 255 };
-    static constexpr Color colorWindArrow              = { 200, 200, 255, 255 };
-}
+    Color colorWindBackground         = { 30, 30, 30, 200 };
+    Color colorWindBorder             = { 100, 100, 100, 255 };
+    Color colorWindArrow              = { 200, 200, 255, 255 };
+
+private:
+    std::string getConfigPath() const;
+    std::string getConfigDirectory() const;
+
+    std::unique_ptr<FileSystemWatcher> watcher;
+};
+
+// Global config instance
+extern Config config;

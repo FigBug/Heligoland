@@ -1,7 +1,11 @@
+#include "Config.h"
 #include "Game.h"
 
 int runGame()
 {
+    config.load();
+    config.startWatching();
+
     Game game;
 
     if (! game.init())
