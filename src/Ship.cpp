@@ -53,8 +53,8 @@ void Ship::update (float dt, Vec2 moveInput, Vec2 aimInput, bool fireInput, floa
     // Fire if requested and ready
     if (fireInput && fireTimer <= 0)
     {
-        fireShells();
-        fireTimer = config.fireInterval;
+        if (fireShells())
+            fireTimer = config.fireInterval;
     }
 
     // Y-axis adjusts throttle (forward/back on stick increases/decreases)
@@ -342,16 +342,19 @@ std::array<Vec2, 4> Ship::getCorners() const
     return worldCorners;
 }
 
-void Ship::fireShells()
+bool Ship::fireShells()
 {
     float cosA = std::cos (angle);
     float sinA = std::sin (angle);
-    // Use minimum range if crosshair is too close
-    float targetRange = std::max (crosshairOffset.length(), config.minShellRange);
     float shellSpeed = config.shipMaxSpeed * config.shellSpeedMultiplier;
+    bool firedAny = false;
 
     for (const auto& turret : turrets)
     {
+        // Only fire if turret is actually aimed at the target
+        if (! turret.isAimedAtTarget())
+            continue;
+
         Vec2 localOffset = turret.getLocalOffset();
 
         // Rotate local offset by ship angle to get world position
@@ -361,11 +364,18 @@ void Ship::fireShells()
 
         Vec2 turretPos = position + worldOffset;
 
+        // Calculate range for this turret: distance from turret to crosshair
+        Vec2 crosshairWorld = position + crosshairOffset;
+        float targetRange = std::max ((crosshairWorld - turretPos).length(), config.minShellRange);
+
         // Shell fires in direction turret is facing (world angle)
         Vec2 shellVel = Vec2::fromAngle (turret.getWorldAngle (angle)) * shellSpeed;
 
         pendingShells.push_back (Shell (turretPos, shellVel, playerIndex, targetRange));
+        firedAny = true;
     }
+
+    return firedAny;
 }
 
 float Ship::getCrosshairDistance() const

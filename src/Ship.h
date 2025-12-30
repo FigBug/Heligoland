@@ -108,5 +108,5 @@ private:
     void clampToArena (float arenaWidth, float arenaHeight);
     void updateBubbles (float dt);
     void updateSmoke (float dt, Vec2 wind);
-    void fireShells();
+    bool fireShells(); // Returns true if any shells were fired
 };
