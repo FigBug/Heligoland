@@ -118,6 +118,9 @@ bool Config::load()
     // Shells / Firing
     loadValue (j, "fireInterval", fireInterval);
     loadValue (j, "shellSpeedMultiplier", shellSpeedMultiplier);
+    loadValue (j, "shellShipVelocityFactor", shellShipVelocityFactor);
+    loadValue (j, "shellSpread", shellSpread);
+    loadValue (j, "shellRangeVariation", shellRangeVariation);
     loadValue (j, "shellRadius", shellRadius);
     loadValue (j, "shellSplashRadius", shellSplashRadius);
     loadValue (j, "minShellRange", minShellRange);
@@ -285,6 +288,9 @@ bool Config::save() const
     // Shells / Firing
     j["fireInterval"] = fireInterval;
     j["shellSpeedMultiplier"] = shellSpeedMultiplier;
+    j["shellShipVelocityFactor"] = shellShipVelocityFactor;
+    j["shellSpread"] = shellSpread;
+    j["shellRangeVariation"] = shellRangeVariation;
     j["shellRadius"] = shellRadius;
     j["shellSplashRadius"] = shellSplashRadius;
     j["minShellRange"] = minShellRange;

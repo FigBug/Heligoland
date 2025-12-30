@@ -368,8 +368,18 @@ bool Ship::fireShells()
         Vec2 crosshairWorld = position + crosshairOffset;
         float targetRange = std::max ((crosshairWorld - turretPos).length(), config.minShellRange);
 
-        // Shell fires in direction turret is facing (world angle)
-        Vec2 shellVel = Vec2::fromAngle (turret.getWorldAngle (angle)) * shellSpeed;
+        // Apply random range variation
+        float rangeVariation = ((float) rand() / RAND_MAX - 0.5f) * 2.0f * config.shellRangeVariation;
+        targetRange *= (1.0f + rangeVariation);
+
+        // Apply random angle spread
+        float spreadAngle = ((float) rand() / RAND_MAX - 0.5f) * 2.0f * config.shellSpread;
+        float fireAngle = turret.getWorldAngle (angle) + spreadAngle;
+
+        // Shell fires in direction turret is facing (with spread)
+        // Ship velocity affects shell velocity (firing forward = faster, backward = slower)
+        Vec2 shellVel = Vec2::fromAngle (fireAngle) * shellSpeed
+                      + velocity * config.shellShipVelocityFactor;
 
         pendingShells.push_back (Shell (turretPos, shellVel, playerIndex, targetRange));
         firedAny = true;

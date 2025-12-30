@@ -62,6 +62,9 @@ public:
     // -------------------------------------------------------------------------
     float fireInterval                = 15.0f;     // Seconds between shots
     float shellSpeedMultiplier        = 5.0f;      // Shell speed = ship max speed * this
+    float shellShipVelocityFactor     = 0.25f;    // How much ship velocity affects shell (0 = none, 1 = full)
+    float shellSpread                 = 0.03f;    // Random angle deviation in radians (~1.7 degrees)
+    float shellRangeVariation         = 0.05f;    // Random range variation (0.05 = ±5%)
     float shellRadius                 = 2.0f;
     float shellSplashRadius           = 4.0f;      // Hit detection radius when shell lands
     float minShellRange               = 50.0f;     // Minimum range shells can travel
