@@ -46,16 +46,9 @@ void Ship::update (float dt, Vec2 moveInput, Vec2 aimInput, bool fireInput, floa
     float damagePercent = getDamagePercent();
     float damagePenalty = 1.0f - (damagePercent * config.shipDamagePenaltyMax);
 
-    // Update fire timer
-    if (fireTimer > 0)
-        fireTimer -= dt;
-
-    // Fire if requested and ready
-    if (fireInput && fireTimer <= 0)
-    {
-        if (fireShells())
-            fireTimer = config.fireInterval;
-    }
+    // Fire if requested (turrets handle their own reload timers)
+    if (fireInput)
+        fireShells();
 
     // Y-axis adjusts throttle (forward/back on stick increases/decreases)
     float throttleInput = -moveInput.y; // Negative because stick up is negative
@@ -352,10 +345,10 @@ bool Ship::fireShells()
     float shellSpeed = config.shipMaxSpeed * config.shellSpeedMultiplier;
     bool firedAny = false;
 
-    for (const auto& turret : turrets)
+    for (auto& turret : turrets)
     {
-        // Only fire if turret is actually aimed at the target
-        if (! turret.isAimedAtTarget())
+        // Only fire if turret is loaded and actually aimed at the target
+        if (! turret.isLoaded() || ! turret.isAimedAtTarget())
             continue;
 
         Vec2 localOffset = turret.getLocalOffset();
@@ -385,6 +378,7 @@ bool Ship::fireShells()
                       + velocity * config.shellShipVelocityFactor;
 
         pendingShells.push_back (Shell (turretPos, shellVel, playerIndex, targetRange));
+        turret.fire();
         firedAny = true;
     }
 
@@ -410,20 +404,25 @@ void Ship::setCrosshairPosition (Vec2 worldPos)
 
 bool Ship::isReadyToFire() const
 {
-    // Check if reloaded
-    if (fireTimer > 0)
-        return false;
-
     // Check if crosshair is in valid range
     if (! isCrosshairInRange())
         return false;
 
-    // Check if all turrets are on target
+    // Check if any turret is loaded and on target
     for (const auto& turret : turrets)
-        if (! turret.isOnTarget())
-            return false;
+        if (turret.isLoaded() && turret.isOnTarget())
+            return true;
 
-    return true;
+    return false;
+}
+
+float Ship::getReloadProgress() const
+{
+    // Return the progress of the slowest turret (minimum progress)
+    float minProgress = 1.0f;
+    for (const auto& turret : turrets)
+        minProgress = std::min (minProgress, turret.getReloadProgress());
+    return minProgress;
 }
 
 void Ship::updateBubbles (float dt)

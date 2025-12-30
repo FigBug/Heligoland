@@ -52,8 +52,6 @@ public:
     // Turrets
     // -------------------------------------------------------------------------
     float turretRotationSpeed         = 0.5f;      // Radians per second
-    float turretRadius                = 5.0f;
-    float turretBarrelLength          = 8.0f;
     float turretArcSize               = 0.75f;     // Arc = PI * this (0.75 = 135 degrees)
     float turretOnTargetTolerance     = 0.09f;     // Radians (~5 degrees)
 

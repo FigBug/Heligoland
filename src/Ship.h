@@ -67,7 +67,7 @@ public:
     float getThrottle() const       { return throttle; }
     float getRudder() const         { return rudder; }
     float getCrosshairDistance() const; // Distance from ship to crosshair
-    float getReloadProgress() const { return 1.0f - (fireTimer / config.fireInterval); }
+    float getReloadProgress() const; // Progress of the slowest turret (0.0 to 1.0)
     bool isReadyToFire() const; // True if reloaded AND turrets on target AND in range
     bool isCrosshairInRange() const { return crosshairOffset.length() >= config.minShellRange; }
 
@@ -104,7 +104,6 @@ private:
 
     // Shooting
     std::vector<Shell> pendingShells; // Shells to be added to game
-    float fireTimer = 0.0f;
 
     void clampToArena (float arenaWidth, float arenaHeight);
     void updateBubbles (float dt);

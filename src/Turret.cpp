@@ -72,6 +72,10 @@ float Turret::clampAngleToArc (float desiredAngle) const
 
 void Turret::update (float dt, float shipAngle, Vec2 targetDir)
 {
+    // Update reload timer
+    if (fireTimer > 0)
+        fireTimer -= dt;
+
     if (targetDir.lengthSquared() > 0.01f)
     {
         // Convert world-space target direction to ship-relative angle

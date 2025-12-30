@@ -142,8 +142,6 @@ bool Config::load()
     {
         const auto& s = getSection ("turrets");
         loadValue (s, "rotationSpeed", turretRotationSpeed);
-        loadValue (s, "radius", turretRadius);
-        loadValue (s, "barrelLength", turretBarrelLength);
         loadValue (s, "arcSize", turretArcSize);
         loadValue (s, "onTargetTolerance", turretOnTargetTolerance);
     }
@@ -376,8 +374,6 @@ bool Config::save() const
     // Turrets
     j["turrets"] = {
         { "rotationSpeed", turretRotationSpeed },
-        { "radius", turretRadius },
-        { "barrelLength", turretBarrelLength },
         { "arcSize", turretArcSize },
         { "onTargetTolerance", turretOnTargetTolerance }
     };

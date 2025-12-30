@@ -374,7 +374,8 @@ void Renderer::drawCrosshair (const Ship& ship)
     for (int i = 0; i < 4; ++i)
     {
         Vec2 circlePos = { startX + i * circleSpacing, circleY };
-        Color circleColor = turrets[i].isAimedAtTarget() ? shipColor : config.colorBarBackground;
+        bool isReady = turrets[i].isLoaded() && turrets[i].isAimedAtTarget();
+        Color circleColor = isReady ? shipColor : config.colorBarBackground;
         drawFilledCircle (circlePos, circleRadius, circleColor);
     }
 }
