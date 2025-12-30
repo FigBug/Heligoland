@@ -114,8 +114,6 @@ bool Config::load()
     // Ship Physics
     {
         const auto& s = getSection ("shipPhysics");
-        loadValue (s, "length", shipLength);
-        loadValue (s, "width", shipWidth);
         loadValue (s, "maxSpeed", shipMaxSpeed);
         loadValue (s, "fullSpeedKnots", shipFullSpeedKnots);
         loadValue (s, "accelTime", shipAccelTime);
@@ -348,8 +346,6 @@ bool Config::save() const
 
     // Ship Physics
     j["shipPhysics"] = {
-        { "length", shipLength },
-        { "width", shipWidth },
         { "maxSpeed", shipMaxSpeed },
         { "fullSpeedKnots", shipFullSpeedKnots },
         { "accelTime", shipAccelTime },

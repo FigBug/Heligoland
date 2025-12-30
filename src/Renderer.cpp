@@ -846,7 +846,7 @@ float Renderer::getShipLength() const
     // Ship length is the hull texture height (bow points up in image)
     if (shipTexturesLoaded && shipHullTextures[0].id != 0)
         return (float) shipHullTextures[0].height;
-    return config.shipLength; // Fallback
+    return 0.0f; // Fallback
 }
 
 float Renderer::getShipWidth() const
@@ -854,7 +854,7 @@ float Renderer::getShipWidth() const
     // Ship width is the hull texture width
     if (shipTexturesLoaded && shipHullTextures[0].id != 0)
         return (float) shipHullTextures[0].width;
-    return config.shipWidth; // Fallback
+    return 0.0f; // Fallback
 }
 
 int Renderer::getShipTextureIndex (const Ship& ship) const

@@ -26,8 +26,6 @@ public:
     // -------------------------------------------------------------------------
     // Ship Physics
     // -------------------------------------------------------------------------
-    float shipLength                  = 50.0f;
-    float shipWidth                   = 15.0f;
     float shipMaxSpeed                = 7.0f;
     float shipFullSpeedKnots          = 20.0f;     // Display speed at max velocity
     float shipAccelTime               = 20.0f;     // Seconds to reach full speed or stop from full speed with throttle
@@ -66,7 +64,7 @@ public:
     float shellRadius                 = 2.0f;
     float shellSplashRadius           = 4.0f;      // Hit detection radius when shell lands
     float minShellRange               = 50.0f;     // Minimum range shells can travel
-    float maxShellRange               = 300.0f;    // Maximum range shells can travel
+    float maxShellRange               = 450.0f;    // Maximum range shells can travel
 
     // -------------------------------------------------------------------------
     // Crosshair / Aiming
@@ -110,7 +108,7 @@ public:
     // -------------------------------------------------------------------------
     float windChangeInterval          = 60.0f;     // Seconds between wind target changes
     float windLerpSpeed               = 0.05f;     // How fast wind changes
-    float windMaxDrift                = 0.02f;     // Max shell drift (1%)
+    float windMaxDrift                = 0.02f;     // Max shell drift (2%)
     float windMinStrength             = 0.25f;     // Minimum wind strength
     float windAngleChangeMax          = 0.524f;    // Max angle change (~30 degrees)
     float windStrengthChangeMax       = 0.4f;      // Max strength change
@@ -140,7 +138,7 @@ public:
     float audioGainVariation          = 0.1f;      // +/- 10%
     float audioEngineBaseVolume       = 0.3f;
     float audioEngineThrottleBoost    = 0.7f;
-    float audioMinImpactForSound      = 10.0f;     // Min collision speed for sound
+    float audioMinImpactForSound      = 2.0f;      // Min collision speed for sound
 
     // -------------------------------------------------------------------------
     // Game Flow
