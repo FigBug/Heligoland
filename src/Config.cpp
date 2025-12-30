@@ -13,19 +13,37 @@ namespace
 {
     json colorToJson (Color c)
     {
-        return json::array ({ c.r, c.g, c.b, c.a });
+        char hex[10];
+        snprintf (hex, sizeof (hex), "#%02X%02X%02X%02X", c.r, c.g, c.b, c.a);
+        return std::string (hex);
     }
 
     Color jsonToColor (const json& j, Color defaultColor)
     {
-        if (! j.is_array() || j.size() != 4)
+        if (! j.is_string())
             return defaultColor;
 
+        std::string s = j.get<std::string>();
+        if (s.empty() || s[0] != '#' || (s.length() != 7 && s.length() != 9))
+            return defaultColor;
+
+        unsigned int r, g, b, a = 255;
+        if (s.length() == 7)
+        {
+            if (sscanf (s.c_str(), "#%02X%02X%02X", &r, &g, &b) != 3)
+                return defaultColor;
+        }
+        else
+        {
+            if (sscanf (s.c_str(), "#%02X%02X%02X%02X", &r, &g, &b, &a) != 4)
+                return defaultColor;
+        }
+
         return {
-            static_cast<unsigned char> (j[0].get<int>()),
-            static_cast<unsigned char> (j[1].get<int>()),
-            static_cast<unsigned char> (j[2].get<int>()),
-            static_cast<unsigned char> (j[3].get<int>())
+            static_cast<unsigned char> (r),
+            static_cast<unsigned char> (g),
+            static_cast<unsigned char> (b),
+            static_cast<unsigned char> (a)
         };
     }
 
@@ -87,166 +105,234 @@ bool Config::load()
         return false;
     }
 
+    // Helper to get a section if it exists
+    auto getSection = [&j] (const char* name) -> const json& {
+        static const json empty = json::object();
+        return j.contains (name) ? j[name] : empty;
+    };
+
     // Ship Physics
-    loadValue (j, "shipLength", shipLength);
-    loadValue (j, "shipWidth", shipWidth);
-    loadValue (j, "shipMaxSpeed", shipMaxSpeed);
-    loadValue (j, "shipFullSpeedKnots", shipFullSpeedKnots);
-    loadValue (j, "shipAccelTime", shipAccelTime);
-    loadValue (j, "shipCoastStopTime", shipCoastStopTime);
-    loadValue (j, "shipThrottleRate", shipThrottleRate);
-    loadValue (j, "shipRudderRate", shipRudderRate);
-    loadValue (j, "shipRudderReturn", shipRudderReturn);
-    loadValue (j, "shipDragCoefficient", shipDragCoefficient);
-    loadValue (j, "shipMinTurnRadiusMultiplier", shipMinTurnRadiusMultiplier);
-    loadValue (j, "shipDamagePenaltyMax", shipDamagePenaltyMax);
-    loadValue (j, "shipSinkDuration", shipSinkDuration);
-    loadValue (j, "shipSinkVelocityDecay", shipSinkVelocityDecay);
-    loadValue (j, "shipSinkAngularDecay", shipSinkAngularDecay);
-    loadValue (j, "shipReverseSpeedMultiplier", shipReverseSpeedMultiplier);
+    {
+        const auto& s = getSection ("shipPhysics");
+        loadValue (s, "length", shipLength);
+        loadValue (s, "width", shipWidth);
+        loadValue (s, "maxSpeed", shipMaxSpeed);
+        loadValue (s, "fullSpeedKnots", shipFullSpeedKnots);
+        loadValue (s, "accelTime", shipAccelTime);
+        loadValue (s, "coastStopTime", shipCoastStopTime);
+        loadValue (s, "throttleRate", shipThrottleRate);
+        loadValue (s, "rudderRate", shipRudderRate);
+        loadValue (s, "rudderReturn", shipRudderReturn);
+        loadValue (s, "minTurnRadiusMultiplier", shipMinTurnRadiusMultiplier);
+        loadValue (s, "damagePenaltyMax", shipDamagePenaltyMax);
+        loadValue (s, "sinkDuration", shipSinkDuration);
+        loadValue (s, "sinkVelocityDecay", shipSinkVelocityDecay);
+        loadValue (s, "sinkAngularDecay", shipSinkAngularDecay);
+        loadValue (s, "reverseSpeedMultiplier", shipReverseSpeedMultiplier);
+    }
 
     // Ship Health
-    loadValue (j, "shipMaxHealth", shipMaxHealth);
-    loadValue (j, "shellDamage", shellDamage);
+    {
+        const auto& s = getSection ("shipHealth");
+        loadValue (s, "maxHealth", shipMaxHealth);
+        loadValue (s, "shellDamage", shellDamage);
+    }
 
     // Turrets
-    loadValue (j, "turretRotationSpeed", turretRotationSpeed);
-    loadValue (j, "turretRadius", turretRadius);
-    loadValue (j, "turretBarrelLength", turretBarrelLength);
-    loadValue (j, "turretArcSize", turretArcSize);
-    loadValue (j, "turretOnTargetTolerance", turretOnTargetTolerance);
+    {
+        const auto& s = getSection ("turrets");
+        loadValue (s, "rotationSpeed", turretRotationSpeed);
+        loadValue (s, "radius", turretRadius);
+        loadValue (s, "barrelLength", turretBarrelLength);
+        loadValue (s, "arcSize", turretArcSize);
+        loadValue (s, "onTargetTolerance", turretOnTargetTolerance);
+    }
 
     // Shells / Firing
-    loadValue (j, "fireInterval", fireInterval);
-    loadValue (j, "shellSpeedMultiplier", shellSpeedMultiplier);
-    loadValue (j, "shellShipVelocityFactor", shellShipVelocityFactor);
-    loadValue (j, "shellSpread", shellSpread);
-    loadValue (j, "shellRangeVariation", shellRangeVariation);
-    loadValue (j, "shellRadius", shellRadius);
-    loadValue (j, "shellSplashRadius", shellSplashRadius);
-    loadValue (j, "minShellRange", minShellRange);
+    {
+        const auto& s = getSection ("shells");
+        loadValue (s, "fireInterval", fireInterval);
+        loadValue (s, "speedMultiplier", shellSpeedMultiplier);
+        loadValue (s, "shipVelocityFactor", shellShipVelocityFactor);
+        loadValue (s, "spread", shellSpread);
+        loadValue (s, "rangeVariation", shellRangeVariation);
+        loadValue (s, "radius", shellRadius);
+        loadValue (s, "splashRadius", shellSplashRadius);
+        loadValue (s, "minRange", minShellRange);
+        loadValue (s, "maxRange", maxShellRange);
+    }
 
     // Crosshair / Aiming
-    loadValue (j, "crosshairSpeed", crosshairSpeed);
-    loadValue (j, "maxCrosshairDistance", maxCrosshairDistance);
-    loadValue (j, "crosshairStartDistance", crosshairStartDistance);
+    {
+        const auto& s = getSection ("crosshair");
+        loadValue (s, "speed", crosshairSpeed);
+        loadValue (s, "startDistance", crosshairStartDistance);
+    }
 
     // Bubbles
-    loadValue (j, "bubbleMinSpeed", bubbleMinSpeed);
-    loadValue (j, "bubbleSpawnInterval", bubbleSpawnInterval);
-    loadValue (j, "bubbleFadeTime", bubbleFadeTime);
-    loadValue (j, "bubbleMinRadius", bubbleMinRadius);
-    loadValue (j, "bubbleRadiusVariation", bubbleRadiusVariation);
+    {
+        const auto& s = getSection ("bubbles");
+        loadValue (s, "minSpeed", bubbleMinSpeed);
+        loadValue (s, "spawnInterval", bubbleSpawnInterval);
+        loadValue (s, "fadeTime", bubbleFadeTime);
+        loadValue (s, "minRadius", bubbleMinRadius);
+        loadValue (s, "radiusVariation", bubbleRadiusVariation);
+    }
 
     // Smoke
-    loadValue (j, "smokeFadeTimeMin", smokeFadeTimeMin);
-    loadValue (j, "smokeFadeTimeMax", smokeFadeTimeMax);
-    loadValue (j, "smokeWindStrength", smokeWindStrength);
-    loadValue (j, "smokeBaseSpawnInterval", smokeBaseSpawnInterval);
-    loadValue (j, "smokeDamageMultiplier", smokeDamageMultiplier);
-    loadValue (j, "smokeBaseRadius", smokeBaseRadius);
-    loadValue (j, "smokeBaseAlpha", smokeBaseAlpha);
-    loadValue (j, "smokeWindAngleVariation", smokeWindAngleVariation);
-    loadValue (j, "smokeGreyStart", smokeGreyStart);
-    loadValue (j, "smokeGreyEnd", smokeGreyEnd);
+    {
+        const auto& s = getSection ("smoke");
+        loadValue (s, "fadeTimeMin", smokeFadeTimeMin);
+        loadValue (s, "fadeTimeMax", smokeFadeTimeMax);
+        loadValue (s, "windStrength", smokeWindStrength);
+        loadValue (s, "baseSpawnInterval", smokeBaseSpawnInterval);
+        loadValue (s, "damageMultiplier", smokeDamageMultiplier);
+        loadValue (s, "baseRadius", smokeBaseRadius);
+        loadValue (s, "baseAlpha", smokeBaseAlpha);
+        loadValue (s, "windAngleVariation", smokeWindAngleVariation);
+        loadValue (s, "greyStart", smokeGreyStart);
+        loadValue (s, "greyEnd", smokeGreyEnd);
+    }
 
     // Explosions
-    loadValue (j, "explosionDuration", explosionDuration);
-    loadValue (j, "explosionMaxRadius", explosionMaxRadius);
-    loadValue (j, "sinkExplosionDuration", sinkExplosionDuration);
-    loadValue (j, "sinkExplosionMaxRadius", sinkExplosionMaxRadius);
+    {
+        const auto& s = getSection ("explosions");
+        loadValue (s, "duration", explosionDuration);
+        loadValue (s, "maxRadius", explosionMaxRadius);
+        loadValue (s, "sinkDuration", sinkExplosionDuration);
+        loadValue (s, "sinkMaxRadius", sinkExplosionMaxRadius);
+    }
 
     // Wind
-    loadValue (j, "windChangeInterval", windChangeInterval);
-    loadValue (j, "windLerpSpeed", windLerpSpeed);
-    loadValue (j, "windMaxDrift", windMaxDrift);
-    loadValue (j, "windMinStrength", windMinStrength);
-    loadValue (j, "windAngleChangeMax", windAngleChangeMax);
-    loadValue (j, "windStrengthChangeMax", windStrengthChangeMax);
+    {
+        const auto& s = getSection ("wind");
+        loadValue (s, "changeInterval", windChangeInterval);
+        loadValue (s, "lerpSpeed", windLerpSpeed);
+        loadValue (s, "maxDrift", windMaxDrift);
+        loadValue (s, "minStrength", windMinStrength);
+        loadValue (s, "angleChangeMax", windAngleChangeMax);
+        loadValue (s, "strengthChangeMax", windStrengthChangeMax);
+    }
 
     // Collision
-    loadValue (j, "collisionRestitution", collisionRestitution);
-    loadValue (j, "collisionAngularFactor", collisionAngularFactor);
-    loadValue (j, "collisionDamageScale", collisionDamageScale);
-    loadValue (j, "wallBounceMultiplier", wallBounceMultiplier);
+    {
+        const auto& s = getSection ("collision");
+        loadValue (s, "restitution", collisionRestitution);
+        loadValue (s, "angularFactor", collisionAngularFactor);
+        loadValue (s, "damageScale", collisionDamageScale);
+        loadValue (s, "wallBounceMultiplier", wallBounceMultiplier);
+    }
 
     // AI
-    loadValue (j, "aiWanderInterval", aiWanderInterval);
-    loadValue (j, "aiWanderMargin", aiWanderMargin);
-    loadValue (j, "aiLookAheadTime", aiLookAheadTime);
-    loadValue (j, "aiFireDistance", aiFireDistance);
-    loadValue (j, "aiCrosshairTolerance", aiCrosshairTolerance);
-    loadValue (j, "aiMinImpactForSound", aiMinImpactForSound);
+    {
+        const auto& s = getSection ("ai");
+        loadValue (s, "wanderInterval", aiWanderInterval);
+        loadValue (s, "wanderMargin", aiWanderMargin);
+        loadValue (s, "lookAheadTime", aiLookAheadTime);
+        loadValue (s, "fireDistance", aiFireDistance);
+        loadValue (s, "crosshairTolerance", aiCrosshairTolerance);
+    }
 
     // Audio
-    loadValue (j, "audioGunSilenceDuration", audioGunSilenceDuration);
-    loadValue (j, "audioPitchVariation", audioPitchVariation);
-    loadValue (j, "audioGainVariation", audioGainVariation);
-    loadValue (j, "audioEngineBaseVolume", audioEngineBaseVolume);
-    loadValue (j, "audioEngineThrottleBoost", audioEngineThrottleBoost);
+    {
+        const auto& s = getSection ("audio");
+        loadValue (s, "gunSilenceDuration", audioGunSilenceDuration);
+        loadValue (s, "pitchVariation", audioPitchVariation);
+        loadValue (s, "gainVariation", audioGainVariation);
+        loadValue (s, "engineBaseVolume", audioEngineBaseVolume);
+        loadValue (s, "engineThrottleBoost", audioEngineThrottleBoost);
+        loadValue (s, "minImpactForSound", audioMinImpactForSound);
+    }
 
     // Game Flow
-    loadValue (j, "gameStartDelay", gameStartDelay);
-    loadValue (j, "gameOverTextDelay", gameOverTextDelay);
-    loadValue (j, "gameOverReturnDelay", gameOverReturnDelay);
+    {
+        const auto& s = getSection ("gameFlow");
+        loadValue (s, "startDelay", gameStartDelay);
+        loadValue (s, "overTextDelay", gameOverTextDelay);
+        loadValue (s, "overReturnDelay", gameOverReturnDelay);
+    }
 
     // Colors - Environment
-    loadColor (j, "colorOcean", colorOcean);
-    loadColor (j, "colorWaterHighlight1", colorWaterHighlight1);
-    loadColor (j, "colorWaterHighlight2", colorWaterHighlight2);
-    loadColor (j, "colorWaterHighlight3", colorWaterHighlight3);
+    {
+        const auto& s = getSection ("colorsEnvironment");
+        loadColor (s, "ocean", colorOcean);
+        loadColor (s, "waterHighlight1", colorWaterHighlight1);
+        loadColor (s, "waterHighlight2", colorWaterHighlight2);
+        loadColor (s, "waterHighlight3", colorWaterHighlight3);
+    }
 
     // Colors - Ships (FFA mode)
-    loadColor (j, "colorShipRed", colorShipRed);
-    loadColor (j, "colorShipBlue", colorShipBlue);
-    loadColor (j, "colorShipGreen", colorShipGreen);
-    loadColor (j, "colorShipYellow", colorShipYellow);
+    {
+        const auto& s = getSection ("colorsShipsFFA");
+        loadColor (s, "red", colorShipRed);
+        loadColor (s, "blue", colorShipBlue);
+        loadColor (s, "green", colorShipGreen);
+        loadColor (s, "yellow", colorShipYellow);
+    }
 
     // Colors - Ships (Team mode)
-    loadColor (j, "colorTeam1", colorTeam1);
-    loadColor (j, "colorTeam2", colorTeam2);
+    {
+        const auto& s = getSection ("colorsShipsTeam");
+        loadColor (s, "team1", colorTeam1);
+        loadColor (s, "team2", colorTeam2);
+    }
 
     // Colors - UI
-    loadColor (j, "colorWhite", colorWhite);
-    loadColor (j, "colorBlack", colorBlack);
-    loadColor (j, "colorGrey", colorGrey);
-    loadColor (j, "colorGreyDark", colorGreyDark);
-    loadColor (j, "colorGreyMid", colorGreyMid);
-    loadColor (j, "colorGreyLight", colorGreyLight);
-    loadColor (j, "colorGreySubtle", colorGreySubtle);
-    loadColor (j, "colorBarBackground", colorBarBackground);
-    loadColor (j, "colorHudBackground", colorHudBackground);
+    {
+        const auto& s = getSection ("colorsUI");
+        loadColor (s, "white", colorWhite);
+        loadColor (s, "black", colorBlack);
+        loadColor (s, "grey", colorGrey);
+        loadColor (s, "greyDark", colorGreyDark);
+        loadColor (s, "greyMid", colorGreyMid);
+        loadColor (s, "greyLight", colorGreyLight);
+        loadColor (s, "greySubtle", colorGreySubtle);
+        loadColor (s, "barBackground", colorBarBackground);
+        loadColor (s, "hudBackground", colorHudBackground);
+    }
 
     // Colors - Title Screen
-    loadColor (j, "colorTitle", colorTitle);
-    loadColor (j, "colorSubtitle", colorSubtitle);
-    loadColor (j, "colorModeText", colorModeText);
-    loadColor (j, "colorInstruction", colorInstruction);
+    {
+        const auto& s = getSection ("colorsTitleScreen");
+        loadColor (s, "title", colorTitle);
+        loadColor (s, "subtitle", colorSubtitle);
+        loadColor (s, "modeText", colorModeText);
+        loadColor (s, "instruction", colorInstruction);
+    }
 
     // Colors - Gameplay
-    loadColor (j, "colorShell", colorShell);
-    loadValue (j, "shellTrailLength", shellTrailLength);
-    loadValue (j, "shellTrailSegments", shellTrailSegments);
-    loadColor (j, "colorBubble", colorBubble);
-    loadColor (j, "colorBarrel", colorBarrel);
-    loadColor (j, "colorReloadReady", colorReloadReady);
-    loadColor (j, "colorReloadNotReady", colorReloadNotReady);
-    loadColor (j, "colorFiringRange", colorFiringRange);
-    loadColor (j, "colorThrottleBar", colorThrottleBar);
-    loadColor (j, "colorRudderBar", colorRudderBar);
+    {
+        const auto& s = getSection ("colorsGameplay");
+        loadColor (s, "shell", colorShell);
+        loadValue (s, "shellTrailLength", shellTrailLength);
+        loadValue (s, "shellTrailSegments", shellTrailSegments);
+        loadColor (s, "bubble", colorBubble);
+        loadColor (s, "barrel", colorBarrel);
+        loadColor (s, "reloadReady", colorReloadReady);
+        loadColor (s, "reloadNotReady", colorReloadNotReady);
+        loadColor (s, "firingRange", colorFiringRange);
+        loadColor (s, "throttleBar", colorThrottleBar);
+        loadColor (s, "rudderBar", colorRudderBar);
+    }
 
     // Colors - Explosions
-    loadColor (j, "colorExplosionOuter", colorExplosionOuter);
-    loadColor (j, "colorExplosionMid", colorExplosionMid);
-    loadColor (j, "colorExplosionCore", colorExplosionCore);
-    loadColor (j, "colorSplashOuter", colorSplashOuter);
-    loadColor (j, "colorSplashMid", colorSplashMid);
-    loadColor (j, "colorSplashCore", colorSplashCore);
+    {
+        const auto& s = getSection ("colorsExplosions");
+        loadColor (s, "explosionOuter", colorExplosionOuter);
+        loadColor (s, "explosionMid", colorExplosionMid);
+        loadColor (s, "explosionCore", colorExplosionCore);
+        loadColor (s, "splashOuter", colorSplashOuter);
+        loadColor (s, "splashMid", colorSplashMid);
+        loadColor (s, "splashCore", colorSplashCore);
+    }
 
     // Colors - Wind Indicator
-    loadColor (j, "colorWindBackground", colorWindBackground);
-    loadColor (j, "colorWindBorder", colorWindBorder);
-    loadColor (j, "colorWindArrow", colorWindArrow);
+    {
+        const auto& s = getSection ("colorsWindIndicator");
+        loadColor (s, "background", colorWindBackground);
+        loadColor (s, "border", colorWindBorder);
+        loadColor (s, "arrow", colorWindArrow);
+    }
 
     return true;
 }
@@ -259,166 +345,210 @@ bool Config::save() const
 
     json j;
 
+    // Version
+    j["version"] = HELIGOLAND_VERSION;
+
     // Ship Physics
-    j["shipLength"] = shipLength;
-    j["shipWidth"] = shipWidth;
-    j["shipMaxSpeed"] = shipMaxSpeed;
-    j["shipFullSpeedKnots"] = shipFullSpeedKnots;
-    j["shipAccelTime"] = shipAccelTime;
-    j["shipCoastStopTime"] = shipCoastStopTime;
-    j["shipThrottleRate"] = shipThrottleRate;
-    j["shipRudderRate"] = shipRudderRate;
-    j["shipRudderReturn"] = shipRudderReturn;
-    j["shipDragCoefficient"] = shipDragCoefficient;
-    j["shipMinTurnRadiusMultiplier"] = shipMinTurnRadiusMultiplier;
-    j["shipDamagePenaltyMax"] = shipDamagePenaltyMax;
-    j["shipSinkDuration"] = shipSinkDuration;
-    j["shipSinkVelocityDecay"] = shipSinkVelocityDecay;
-    j["shipSinkAngularDecay"] = shipSinkAngularDecay;
-    j["shipReverseSpeedMultiplier"] = shipReverseSpeedMultiplier;
+    j["shipPhysics"] = {
+        { "length", shipLength },
+        { "width", shipWidth },
+        { "maxSpeed", shipMaxSpeed },
+        { "fullSpeedKnots", shipFullSpeedKnots },
+        { "accelTime", shipAccelTime },
+        { "coastStopTime", shipCoastStopTime },
+        { "throttleRate", shipThrottleRate },
+        { "rudderRate", shipRudderRate },
+        { "rudderReturn", shipRudderReturn },
+        { "minTurnRadiusMultiplier", shipMinTurnRadiusMultiplier },
+        { "damagePenaltyMax", shipDamagePenaltyMax },
+        { "sinkDuration", shipSinkDuration },
+        { "sinkVelocityDecay", shipSinkVelocityDecay },
+        { "sinkAngularDecay", shipSinkAngularDecay },
+        { "reverseSpeedMultiplier", shipReverseSpeedMultiplier }
+    };
 
     // Ship Health
-    j["shipMaxHealth"] = shipMaxHealth;
-    j["shellDamage"] = shellDamage;
+    j["shipHealth"] = {
+        { "maxHealth", shipMaxHealth },
+        { "shellDamage", shellDamage }
+    };
 
     // Turrets
-    j["turretRotationSpeed"] = turretRotationSpeed;
-    j["turretRadius"] = turretRadius;
-    j["turretBarrelLength"] = turretBarrelLength;
-    j["turretArcSize"] = turretArcSize;
-    j["turretOnTargetTolerance"] = turretOnTargetTolerance;
+    j["turrets"] = {
+        { "rotationSpeed", turretRotationSpeed },
+        { "radius", turretRadius },
+        { "barrelLength", turretBarrelLength },
+        { "arcSize", turretArcSize },
+        { "onTargetTolerance", turretOnTargetTolerance }
+    };
 
     // Shells / Firing
-    j["fireInterval"] = fireInterval;
-    j["shellSpeedMultiplier"] = shellSpeedMultiplier;
-    j["shellShipVelocityFactor"] = shellShipVelocityFactor;
-    j["shellSpread"] = shellSpread;
-    j["shellRangeVariation"] = shellRangeVariation;
-    j["shellRadius"] = shellRadius;
-    j["shellSplashRadius"] = shellSplashRadius;
-    j["minShellRange"] = minShellRange;
+    j["shells"] = {
+        { "fireInterval", fireInterval },
+        { "speedMultiplier", shellSpeedMultiplier },
+        { "shipVelocityFactor", shellShipVelocityFactor },
+        { "spread", shellSpread },
+        { "rangeVariation", shellRangeVariation },
+        { "radius", shellRadius },
+        { "splashRadius", shellSplashRadius },
+        { "minRange", minShellRange },
+        { "maxRange", maxShellRange }
+    };
 
     // Crosshair / Aiming
-    j["crosshairSpeed"] = crosshairSpeed;
-    j["maxCrosshairDistance"] = maxCrosshairDistance;
-    j["crosshairStartDistance"] = crosshairStartDistance;
+    j["crosshair"] = {
+        { "speed", crosshairSpeed },
+        { "startDistance", crosshairStartDistance }
+    };
 
     // Bubbles
-    j["bubbleMinSpeed"] = bubbleMinSpeed;
-    j["bubbleSpawnInterval"] = bubbleSpawnInterval;
-    j["bubbleFadeTime"] = bubbleFadeTime;
-    j["bubbleMinRadius"] = bubbleMinRadius;
-    j["bubbleRadiusVariation"] = bubbleRadiusVariation;
+    j["bubbles"] = {
+        { "minSpeed", bubbleMinSpeed },
+        { "spawnInterval", bubbleSpawnInterval },
+        { "fadeTime", bubbleFadeTime },
+        { "minRadius", bubbleMinRadius },
+        { "radiusVariation", bubbleRadiusVariation }
+    };
 
     // Smoke
-    j["smokeFadeTimeMin"] = smokeFadeTimeMin;
-    j["smokeFadeTimeMax"] = smokeFadeTimeMax;
-    j["smokeWindStrength"] = smokeWindStrength;
-    j["smokeBaseSpawnInterval"] = smokeBaseSpawnInterval;
-    j["smokeDamageMultiplier"] = smokeDamageMultiplier;
-    j["smokeBaseRadius"] = smokeBaseRadius;
-    j["smokeBaseAlpha"] = smokeBaseAlpha;
-    j["smokeWindAngleVariation"] = smokeWindAngleVariation;
-    j["smokeGreyStart"] = smokeGreyStart;
-    j["smokeGreyEnd"] = smokeGreyEnd;
+    j["smoke"] = {
+        { "fadeTimeMin", smokeFadeTimeMin },
+        { "fadeTimeMax", smokeFadeTimeMax },
+        { "windStrength", smokeWindStrength },
+        { "baseSpawnInterval", smokeBaseSpawnInterval },
+        { "damageMultiplier", smokeDamageMultiplier },
+        { "baseRadius", smokeBaseRadius },
+        { "baseAlpha", smokeBaseAlpha },
+        { "windAngleVariation", smokeWindAngleVariation },
+        { "greyStart", smokeGreyStart },
+        { "greyEnd", smokeGreyEnd }
+    };
 
     // Explosions
-    j["explosionDuration"] = explosionDuration;
-    j["explosionMaxRadius"] = explosionMaxRadius;
-    j["sinkExplosionDuration"] = sinkExplosionDuration;
-    j["sinkExplosionMaxRadius"] = sinkExplosionMaxRadius;
+    j["explosions"] = {
+        { "duration", explosionDuration },
+        { "maxRadius", explosionMaxRadius },
+        { "sinkDuration", sinkExplosionDuration },
+        { "sinkMaxRadius", sinkExplosionMaxRadius }
+    };
 
     // Wind
-    j["windChangeInterval"] = windChangeInterval;
-    j["windLerpSpeed"] = windLerpSpeed;
-    j["windMaxDrift"] = windMaxDrift;
-    j["windMinStrength"] = windMinStrength;
-    j["windAngleChangeMax"] = windAngleChangeMax;
-    j["windStrengthChangeMax"] = windStrengthChangeMax;
+    j["wind"] = {
+        { "changeInterval", windChangeInterval },
+        { "lerpSpeed", windLerpSpeed },
+        { "maxDrift", windMaxDrift },
+        { "minStrength", windMinStrength },
+        { "angleChangeMax", windAngleChangeMax },
+        { "strengthChangeMax", windStrengthChangeMax }
+    };
 
     // Collision
-    j["collisionRestitution"] = collisionRestitution;
-    j["collisionAngularFactor"] = collisionAngularFactor;
-    j["collisionDamageScale"] = collisionDamageScale;
-    j["wallBounceMultiplier"] = wallBounceMultiplier;
+    j["collision"] = {
+        { "restitution", collisionRestitution },
+        { "angularFactor", collisionAngularFactor },
+        { "damageScale", collisionDamageScale },
+        { "wallBounceMultiplier", wallBounceMultiplier }
+    };
 
     // AI
-    j["aiWanderInterval"] = aiWanderInterval;
-    j["aiWanderMargin"] = aiWanderMargin;
-    j["aiLookAheadTime"] = aiLookAheadTime;
-    j["aiFireDistance"] = aiFireDistance;
-    j["aiCrosshairTolerance"] = aiCrosshairTolerance;
-    j["aiMinImpactForSound"] = aiMinImpactForSound;
+    j["ai"] = {
+        { "wanderInterval", aiWanderInterval },
+        { "wanderMargin", aiWanderMargin },
+        { "lookAheadTime", aiLookAheadTime },
+        { "fireDistance", aiFireDistance },
+        { "crosshairTolerance", aiCrosshairTolerance }
+    };
 
     // Audio
-    j["audioGunSilenceDuration"] = audioGunSilenceDuration;
-    j["audioPitchVariation"] = audioPitchVariation;
-    j["audioGainVariation"] = audioGainVariation;
-    j["audioEngineBaseVolume"] = audioEngineBaseVolume;
-    j["audioEngineThrottleBoost"] = audioEngineThrottleBoost;
+    j["audio"] = {
+        { "gunSilenceDuration", audioGunSilenceDuration },
+        { "pitchVariation", audioPitchVariation },
+        { "gainVariation", audioGainVariation },
+        { "engineBaseVolume", audioEngineBaseVolume },
+        { "engineThrottleBoost", audioEngineThrottleBoost },
+        { "minImpactForSound", audioMinImpactForSound }
+    };
 
     // Game Flow
-    j["gameStartDelay"] = gameStartDelay;
-    j["gameOverTextDelay"] = gameOverTextDelay;
-    j["gameOverReturnDelay"] = gameOverReturnDelay;
+    j["gameFlow"] = {
+        { "startDelay", gameStartDelay },
+        { "overTextDelay", gameOverTextDelay },
+        { "overReturnDelay", gameOverReturnDelay }
+    };
 
     // Colors - Environment
-    j["colorOcean"] = colorToJson (colorOcean);
-    j["colorWaterHighlight1"] = colorToJson (colorWaterHighlight1);
-    j["colorWaterHighlight2"] = colorToJson (colorWaterHighlight2);
-    j["colorWaterHighlight3"] = colorToJson (colorWaterHighlight3);
+    j["colorsEnvironment"] = {
+        { "ocean", colorToJson (colorOcean) },
+        { "waterHighlight1", colorToJson (colorWaterHighlight1) },
+        { "waterHighlight2", colorToJson (colorWaterHighlight2) },
+        { "waterHighlight3", colorToJson (colorWaterHighlight3) }
+    };
 
     // Colors - Ships (FFA mode)
-    j["colorShipRed"] = colorToJson (colorShipRed);
-    j["colorShipBlue"] = colorToJson (colorShipBlue);
-    j["colorShipGreen"] = colorToJson (colorShipGreen);
-    j["colorShipYellow"] = colorToJson (colorShipYellow);
+    j["colorsShipsFFA"] = {
+        { "red", colorToJson (colorShipRed) },
+        { "blue", colorToJson (colorShipBlue) },
+        { "green", colorToJson (colorShipGreen) },
+        { "yellow", colorToJson (colorShipYellow) }
+    };
 
     // Colors - Ships (Team mode)
-    j["colorTeam1"] = colorToJson (colorTeam1);
-    j["colorTeam2"] = colorToJson (colorTeam2);
+    j["colorsShipsTeam"] = {
+        { "team1", colorToJson (colorTeam1) },
+        { "team2", colorToJson (colorTeam2) }
+    };
 
     // Colors - UI
-    j["colorWhite"] = colorToJson (colorWhite);
-    j["colorBlack"] = colorToJson (colorBlack);
-    j["colorGrey"] = colorToJson (colorGrey);
-    j["colorGreyDark"] = colorToJson (colorGreyDark);
-    j["colorGreyMid"] = colorToJson (colorGreyMid);
-    j["colorGreyLight"] = colorToJson (colorGreyLight);
-    j["colorGreySubtle"] = colorToJson (colorGreySubtle);
-    j["colorBarBackground"] = colorToJson (colorBarBackground);
-    j["colorHudBackground"] = colorToJson (colorHudBackground);
+    j["colorsUI"] = {
+        { "white", colorToJson (colorWhite) },
+        { "black", colorToJson (colorBlack) },
+        { "grey", colorToJson (colorGrey) },
+        { "greyDark", colorToJson (colorGreyDark) },
+        { "greyMid", colorToJson (colorGreyMid) },
+        { "greyLight", colorToJson (colorGreyLight) },
+        { "greySubtle", colorToJson (colorGreySubtle) },
+        { "barBackground", colorToJson (colorBarBackground) },
+        { "hudBackground", colorToJson (colorHudBackground) }
+    };
 
     // Colors - Title Screen
-    j["colorTitle"] = colorToJson (colorTitle);
-    j["colorSubtitle"] = colorToJson (colorSubtitle);
-    j["colorModeText"] = colorToJson (colorModeText);
-    j["colorInstruction"] = colorToJson (colorInstruction);
+    j["colorsTitleScreen"] = {
+        { "title", colorToJson (colorTitle) },
+        { "subtitle", colorToJson (colorSubtitle) },
+        { "modeText", colorToJson (colorModeText) },
+        { "instruction", colorToJson (colorInstruction) }
+    };
 
     // Colors - Gameplay
-    j["colorShell"] = colorToJson (colorShell);
-    j["shellTrailLength"] = shellTrailLength;
-    j["shellTrailSegments"] = shellTrailSegments;
-    j["colorBubble"] = colorToJson (colorBubble);
-    j["colorBarrel"] = colorToJson (colorBarrel);
-    j["colorReloadReady"] = colorToJson (colorReloadReady);
-    j["colorReloadNotReady"] = colorToJson (colorReloadNotReady);
-    j["colorFiringRange"] = colorToJson (colorFiringRange);
-    j["colorThrottleBar"] = colorToJson (colorThrottleBar);
-    j["colorRudderBar"] = colorToJson (colorRudderBar);
+    j["colorsGameplay"] = {
+        { "shell", colorToJson (colorShell) },
+        { "shellTrailLength", shellTrailLength },
+        { "shellTrailSegments", shellTrailSegments },
+        { "bubble", colorToJson (colorBubble) },
+        { "barrel", colorToJson (colorBarrel) },
+        { "reloadReady", colorToJson (colorReloadReady) },
+        { "reloadNotReady", colorToJson (colorReloadNotReady) },
+        { "firingRange", colorToJson (colorFiringRange) },
+        { "throttleBar", colorToJson (colorThrottleBar) },
+        { "rudderBar", colorToJson (colorRudderBar) }
+    };
 
     // Colors - Explosions
-    j["colorExplosionOuter"] = colorToJson (colorExplosionOuter);
-    j["colorExplosionMid"] = colorToJson (colorExplosionMid);
-    j["colorExplosionCore"] = colorToJson (colorExplosionCore);
-    j["colorSplashOuter"] = colorToJson (colorSplashOuter);
-    j["colorSplashMid"] = colorToJson (colorSplashMid);
-    j["colorSplashCore"] = colorToJson (colorSplashCore);
+    j["colorsExplosions"] = {
+        { "explosionOuter", colorToJson (colorExplosionOuter) },
+        { "explosionMid", colorToJson (colorExplosionMid) },
+        { "explosionCore", colorToJson (colorExplosionCore) },
+        { "splashOuter", colorToJson (colorSplashOuter) },
+        { "splashMid", colorToJson (colorSplashMid) },
+        { "splashCore", colorToJson (colorSplashCore) }
+    };
 
     // Colors - Wind Indicator
-    j["colorWindBackground"] = colorToJson (colorWindBackground);
-    j["colorWindBorder"] = colorToJson (colorWindBorder);
-    j["colorWindArrow"] = colorToJson (colorWindArrow);
+    j["colorsWindIndicator"] = {
+        { "background", colorToJson (colorWindBackground) },
+        { "border", colorToJson (colorWindBorder) },
+        { "arrow", colorToJson (colorWindArrow) }
+    };
 
     std::ofstream file (path);
     if (! file.is_open())

@@ -611,7 +611,7 @@ void Game::checkCollisions()
                 ships[j]->takeDamage (damage);
 
                 // Play collision sound at collision point
-                if (audio && impactSpeed > config.aiMinImpactForSound)
+                if (audio && impactSpeed > config.audioMinImpactForSound)
                 {
                     float arenaWidth, arenaHeight;
                     getWindowSize (arenaWidth, arenaHeight);

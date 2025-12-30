@@ -35,7 +35,6 @@ public:
     float shipThrottleRate            = 0.5f;      // How fast throttle changes per second
     float shipRudderRate              = 2.0f;      // How fast rudder moves
     float shipRudderReturn            = 3.0f;      // How fast rudder returns to center
-    float shipDragCoefficient         = 0.995f;    // Velocity multiplier when coasting
     float shipMinTurnRadiusMultiplier = 2.0f;      // Min turn radius = length * this
     float shipDamagePenaltyMax        = 0.2f;      // Max speed/turn reduction at 0% health
     float shipSinkDuration            = 30.0f;     // Seconds to fully sink
@@ -69,12 +68,12 @@ public:
     float shellRadius                 = 2.0f;
     float shellSplashRadius           = 4.0f;      // Hit detection radius when shell lands
     float minShellRange               = 50.0f;     // Minimum range shells can travel
+    float maxShellRange               = 300.0f;    // Maximum range shells can travel
 
     // -------------------------------------------------------------------------
     // Crosshair / Aiming
     // -------------------------------------------------------------------------
     float crosshairSpeed              = 150.0f;    // How fast crosshair moves with stick
-    float maxCrosshairDistance        = 300.0f;
     float crosshairStartDistance      = 150.0f;    // Initial crosshair distance
 
     // -------------------------------------------------------------------------
@@ -134,7 +133,6 @@ public:
     float aiLookAheadTime             = 2.0f;      // Seconds to predict ahead
     float aiFireDistance              = 400.0f;    // Max range AI will try to fire
     float aiCrosshairTolerance        = 30.0f;     // How close crosshair needs to be to fire
-    float aiMinImpactForSound         = 10.0f;     // Min collision speed for sound
 
     // -------------------------------------------------------------------------
     // Audio
@@ -144,6 +142,7 @@ public:
     float audioGainVariation          = 0.1f;      // +/- 10%
     float audioEngineBaseVolume       = 0.3f;
     float audioEngineThrottleBoost    = 0.7f;
+    float audioMinImpactForSound      = 10.0f;     // Min collision speed for sound
 
     // -------------------------------------------------------------------------
     // Game Flow

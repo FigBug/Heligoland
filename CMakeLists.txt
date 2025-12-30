@@ -83,6 +83,10 @@ target_include_directories(${PROJECT_NAME} PRIVATE
 
 target_link_libraries(${PROJECT_NAME} PRIVATE raylib)
 
+target_compile_definitions(${PROJECT_NAME} PRIVATE
+    HELIGOLAND_VERSION="${PROJECT_VERSION}"
+)
+
 # Platform-specific settings
 if(WIN32)
     set_target_properties(${PROJECT_NAME} PROPERTIES WIN32_EXECUTABLE TRUE)

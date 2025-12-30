@@ -3,7 +3,8 @@
 
 int runGame()
 {
-    config.load();
+    if (! config.load())
+        config.save();
     config.startWatching();
 
     Game game;

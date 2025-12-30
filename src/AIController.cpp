@@ -53,7 +53,7 @@ const Ship* AIController::findTarget (const Ship& myShip, const std::vector<cons
         return nullptr;
 
     Vec2 myPos = myShip.getPosition();
-    float firingRange = config.maxCrosshairDistance * personalityFactor;
+    float firingRange = config.maxShellRange * personalityFactor;
 
     // Separate enemies into in-range and out-of-range
     std::vector<const Ship*> inRange;
@@ -203,7 +203,7 @@ void AIController::updateMovement (float dt, const Ship& myShip, const std::vect
             float dist = toTarget.length();
 
             // Get close but not too close (stay at half firing range)
-            float idealDist = config.maxCrosshairDistance * 0.5f * personalityFactor;
+            float idealDist = config.maxShellRange * 0.5f * personalityFactor;
             if (dist > idealDist)
             {
                 desiredDir = toTarget.normalized();
@@ -235,11 +235,11 @@ void AIController::updateMovement (float dt, const Ship& myShip, const std::vect
             bool inEnemyFiringArc = dotProduct > 0.0f;  // Enemy can see us
 
             // Ideal distance - stay just inside our max range, but outside if enemy is aiming at us
-            float idealDist = config.maxCrosshairDistance * 0.9f * personalityFactor;
-            if (inEnemyFiringArc && dist < config.maxCrosshairDistance * personalityFactor)
+            float idealDist = config.maxShellRange * 0.9f * personalityFactor;
+            if (inEnemyFiringArc && dist < config.maxShellRange * personalityFactor)
             {
                 // Enemy can shoot at us - prefer to stay further back
-                idealDist = config.maxCrosshairDistance * 1.05f * personalityFactor;
+                idealDist = config.maxShellRange * 1.05f * personalityFactor;
             }
 
             float tolerance = 40.0f * personalityFactor;
@@ -254,7 +254,7 @@ void AIController::updateMovement (float dt, const Ship& myShip, const std::vect
                 perpendicular = perpendicular * -1.0f;
 
             // Start broadside approach at 1.2x firing range
-            float broadsideStartDist = config.maxCrosshairDistance * 1.2f * personalityFactor;
+            float broadsideStartDist = config.maxShellRange * 1.2f * personalityFactor;
 
             if (dist < idealDist - tolerance)
             {

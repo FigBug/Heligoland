@@ -154,7 +154,7 @@ void Renderer::drawShip (const Ship& ship)
 
     // Draw firing range circle (very faint white) - only for non-sinking ships
     if (ship.isAlive())
-        drawFilledCircle (pos, config.maxCrosshairDistance, config.colorFiringRange);
+        drawFilledCircle (pos, config.maxShellRange, config.colorFiringRange);
 
     // Calculate alpha for sinking ships
     float alpha = 1.0f;

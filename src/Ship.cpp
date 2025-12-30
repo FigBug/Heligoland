@@ -175,8 +175,8 @@ void Ship::update (float dt, Vec2 moveInput, Vec2 aimInput, bool fireInput, floa
 
     // Clamp crosshair to max range
     float crosshairDist = crosshairOffset.length();
-    if (crosshairDist > config.maxCrosshairDistance)
-        crosshairOffset = crosshairOffset.normalized() * config.maxCrosshairDistance;
+    if (crosshairDist > config.maxShellRange)
+        crosshairOffset = crosshairOffset.normalized() * config.maxShellRange;
 
     // Update turrets to aim at crosshair from their individual positions
     crosshairWorldPos = position + crosshairOffset;
@@ -402,9 +402,9 @@ void Ship::setCrosshairPosition (Vec2 worldPos)
 
     // Clamp to max range
     float dist = crosshairOffset.length();
-    if (dist > config.maxCrosshairDistance)
+    if (dist > config.maxShellRange)
     {
-        crosshairOffset = crosshairOffset.normalized() * config.maxCrosshairDistance;
+        crosshairOffset = crosshairOffset.normalized() * config.maxShellRange;
     }
 }
 
