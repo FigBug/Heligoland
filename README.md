@@ -2,8 +2,6 @@
 
 A 4-player naval combat game built with raylib and C++.
 
-[![Watch the video](https://img.youtube.com/vi/j_jJoSP-S_Q/0.jpg)](https://www.youtube.com/watch?v=j_jJoSP-S_Q)
-
 ![Screenshot](screenshots/screenshot1.png)
 
 ![Build macOS](https://github.com/FigBug/Heligoland/actions/workflows/build_macos.yml/badge.svg)

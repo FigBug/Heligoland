@@ -927,7 +927,7 @@ void Game::renderPlaying()
 
     float hudHeight = 50.0f;
     float hudTotalWidth = numShips * hudWidth + (numShips - 1) * hudSpacing;
-    float hudStartX = 10.0f; // Left align with margin
+    float hudStartX = (w - hudTotalWidth) / 2.0f; // Center HUDs (must match Renderer::drawShipHUD)
     float hudY = 10.0f;
 
     for (int i = 0; i < numShips; ++i)
