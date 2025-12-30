@@ -21,10 +21,10 @@ public:
 
 private:
     Vec2 position;
-    Vec2 startPosition;
     Vec2 velocity;
     int ownerIndex; // Which player fired this shell
     bool alive = true;
     bool landed = false; // True when shell reaches target range
-    float targetRange = 150.0f; // Distance shell travels before landing (set by constructor)
+    float flightTime = 0.0f;    // Time shell has been in flight
+    float maxFlightTime = 0.0f; // Time until shell lands (based on range/speed)
 };
