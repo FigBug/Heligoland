@@ -139,7 +139,8 @@ bool Config::load()
     loadValue (j, "bubbleRadiusVariation", bubbleRadiusVariation);
 
     // Smoke
-    loadValue (j, "smokeFadeTime", smokeFadeTime);
+    loadValue (j, "smokeFadeTimeMin", smokeFadeTimeMin);
+    loadValue (j, "smokeFadeTimeMax", smokeFadeTimeMax);
     loadValue (j, "smokeWindStrength", smokeWindStrength);
     loadValue (j, "smokeBaseSpawnInterval", smokeBaseSpawnInterval);
     loadValue (j, "smokeDamageMultiplier", smokeDamageMultiplier);
@@ -310,7 +311,8 @@ bool Config::save() const
     j["bubbleRadiusVariation"] = bubbleRadiusVariation;
 
     // Smoke
-    j["smokeFadeTime"] = smokeFadeTime;
+    j["smokeFadeTimeMin"] = smokeFadeTimeMin;
+    j["smokeFadeTimeMax"] = smokeFadeTimeMax;
     j["smokeWindStrength"] = smokeWindStrength;
     j["smokeBaseSpawnInterval"] = smokeBaseSpawnInterval;
     j["smokeDamageMultiplier"] = smokeDamageMultiplier;

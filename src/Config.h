@@ -89,7 +89,8 @@ public:
     // -------------------------------------------------------------------------
     // Smoke
     // -------------------------------------------------------------------------
-    float smokeFadeTime               = 10.0f;     // Seconds to fade out
+    float smokeFadeTimeMin            = 10.0f;     // Min seconds to fade out
+    float smokeFadeTimeMax            = 14.0f;     // Max seconds to fade out
     float smokeWindStrength           = 30.0f;     // How much wind affects smoke
     float smokeBaseSpawnInterval      = 0.0433f;   // ~30 per second when undamaged
     float smokeDamageMultiplier       = 4.0f;      // Spawn rate increases with damage

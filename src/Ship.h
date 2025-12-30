@@ -20,6 +20,7 @@ struct Smoke
     Vec2 position;
     float radius;
     float alpha; // 0.0 to 1.0
+    float fadeRate; // Alpha reduction per second
     float windAngleOffset; // Random offset added to wind direction
 };
 

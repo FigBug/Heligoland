@@ -473,12 +473,10 @@ void Ship::updateBubbles (float dt)
 
 void Ship::updateSmoke (float dt, Vec2 wind)
 {
-    float fadeRate = 1.0f / config.smokeFadeTime;
-
     // Update existing smoke - fade and move with wind
     for (auto it = smoke.begin(); it != smoke.end();)
     {
-        it->alpha -= fadeRate * dt;
+        it->alpha -= it->fadeRate * dt;
 
         // Apply wind with this particle's fixed angle offset
         float cosR = std::cos (it->windAngleOffset);
@@ -538,9 +536,13 @@ void Ship::updateSmoke (float dt, Vec2 wind)
         // Lower starting alpha for thinner smoke, reduce further when sinking
         float startAlpha = (config.smokeBaseAlpha + damagePercent * 0.4f) * sinkFactor;
 
+        // Random fade rate based on lifetime range
+        float lifetime = config.smokeFadeTimeMin + ((float) rand() / RAND_MAX) * (config.smokeFadeTimeMax - config.smokeFadeTimeMin);
+        float fadeRate = 1.0f / lifetime;
+
         // Random wind angle offset
         float windAngleOffset = ((float) rand() / RAND_MAX - 0.5f) * config.smokeWindAngleVariation;
 
-        smoke.push_back ({ spawnPos, smokeRadius, startAlpha, windAngleOffset });
+        smoke.push_back ({ spawnPos, smokeRadius, startAlpha, fadeRate, windAngleOffset });
     }
 }
