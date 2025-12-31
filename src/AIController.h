@@ -47,6 +47,7 @@ private:
     void updateMovement (float dt, const Ship& myShip, const std::vector<const Ship*>& enemies, const std::vector<Shell>& shells, float arenaWidth, float arenaHeight);
     void updateAim (const Ship& myShip, const Ship* targetShip);
     void avoidEdges (const Ship& myShip, float arenaWidth, float arenaHeight, Vec2& desiredDir);
+    void avoidShips (const Ship& myShip, const std::vector<const Ship*>& enemies, Vec2& desiredDir);
     bool isNearEdge (const Ship& myShip, float arenaWidth, float arenaHeight);
     Vec2 getDodgeDirection (const Ship& myShip, const std::vector<Shell>& shells, float& urgency);
 };

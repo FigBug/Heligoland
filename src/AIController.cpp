@@ -288,6 +288,9 @@ void AIController::updateMovement (float dt, const Ship& myShip, const std::vect
     // Apply edge avoidance
     avoidEdges (myShip, arenaWidth, arenaHeight, desiredDir);
 
+    // Apply ship collision avoidance
+    avoidShips (myShip, enemies, desiredDir);
+
     // Convert desired direction to steering input
     if (desiredDir.lengthSquared() > 0.01f)
     {
@@ -367,6 +370,70 @@ void AIController::avoidEdges (const Ship& myShip, float arenaWidth, float arena
         // Blend avoid direction with desired direction based on urgency
         urgency = std::clamp (urgency * 2.0f, 0.0f, 1.0f);
         desiredDir = desiredDir * (1.0f - urgency) + avoidDir * urgency;
+        if (desiredDir.lengthSquared() > 0.01f)
+            desiredDir = desiredDir.normalized();
+    }
+}
+
+void AIController::avoidShips (const Ship& myShip, const std::vector<const Ship*>& enemies, Vec2& desiredDir)
+{
+    Vec2 myPos = myShip.getPosition();
+    Vec2 myVel = myShip.getVelocity();
+    float mySpeed = myVel.length();
+    float myLength = myShip.getLength();
+
+    Vec2 avoidDir = { 0, 0 };
+    float maxUrgency = 0.0f;
+
+    // Danger zone scales with speed - faster = need more room
+    float dangerRadius = myLength * 2.0f + mySpeed * 1.0f;
+
+    for (const Ship* other : enemies)
+    {
+        if (! other->isVisible())
+            continue;
+
+        Vec2 otherPos = other->getPosition();
+        Vec2 toOther = otherPos - myPos;
+        float dist = toOther.length();
+
+        if (dist < 0.01f || dist > dangerRadius * 2.0f)
+            continue;
+
+        // Check if we're heading toward this ship
+        Vec2 myDir = mySpeed > 0.1f ? myVel.normalized() : Vec2::fromAngle (myShip.getAngle());
+        float dotProduct = myDir.dot (toOther.normalized());
+
+        // Only avoid if we're heading toward the other ship
+        if (dotProduct > 0.0f)
+        {
+            float urgency = (1.0f - dist / (dangerRadius * 2.0f)) * dotProduct;
+
+            if (urgency > 0.0f)
+            {
+                // Steer away - perpendicular to the direction to other ship
+                Vec2 away = toOther.normalized() * -1.0f;
+
+                // Add perpendicular component to go around rather than just back up
+                Vec2 perp = { -toOther.y, toOther.x };
+                perp = perp.normalized();
+
+                // Choose perpendicular direction that's more aligned with current heading
+                if (perp.dot (myDir) < 0)
+                    perp = perp * -1.0f;
+
+                Vec2 steerDir = (away + perp).normalized();
+                avoidDir = avoidDir + steerDir * urgency;
+                maxUrgency = std::max (maxUrgency, urgency);
+            }
+        }
+    }
+
+    if (avoidDir.lengthSquared() > 0.01f)
+    {
+        avoidDir = avoidDir.normalized();
+        maxUrgency = std::clamp (maxUrgency, 0.0f, 0.8f);  // Don't completely override other goals
+        desiredDir = desiredDir * (1.0f - maxUrgency) + avoidDir * maxUrgency;
         if (desiredDir.lengthSquared() > 0.01f)
             desiredDir = desiredDir.normalized();
     }
