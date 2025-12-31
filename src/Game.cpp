@@ -76,7 +76,10 @@ void Game::handleEvents()
 {
     if (IsKeyPressed (KEY_ESCAPE))
     {
-        running = false;
+        if (state == GameState::Title)
+            running = false;
+        else
+            returnToTitle();
     }
 }
 
