@@ -3,16 +3,30 @@
 #include <algorithm>
 #include <cmath>
 
-Ship::Ship (int playerIndex_, Vec2 startPos, float startAngle, float shipLength, float shipWidth, int team_)
-    : playerIndex (playerIndex_), team (team_), position (startPos), angle (startAngle),
+Ship::Ship (int playerIndex_, Vec2 startPos, float startAngle, float shipLength, float shipWidth, int team_, int shipType_)
+    : playerIndex (playerIndex_), team (team_), shipType (std::clamp (shipType_, 0, NUM_SHIP_TYPES - 1)),
+      position (startPos), angle (startAngle),
       length (shipLength), width (shipWidth),
       turrets { {
-          Turret ({ length * 0.35f, 0.0f }, true), // Front
-          Turret ({ length * 0.12f, 0.0f }, true), // Front-mid
-          Turret ({ -length * 0.12f, 0.0f }, false), // Rear-mid
-          Turret ({ -length * 0.35f, 0.0f }, false) // Rear
+          Turret ({ 0.0f, 0.0f }, true),
+          Turret ({ 0.0f, 0.0f }, true),
+          Turret ({ 0.0f, 0.0f }, false),
+          Turret ({ 0.0f, 0.0f }, false)
       } }
 {
+    // Initialize health based on ship type
+    health = getMaxHealth();
+
+    // Configure turrets based on ship type
+    const auto& typeConfig = config.shipTypes[shipType];
+    for (int i = 0; i < typeConfig.numTurrets; ++i)
+    {
+        float offsetX = typeConfig.turrets[i].localOffsetX * length;
+        turrets[i] = Turret ({ offsetX, 0.0f }, typeConfig.turrets[i].isFront);
+        turrets[i].setReloadMultiplier (typeConfig.reloadMultiplier);
+        turrets[i].setRotationSpeedMultiplier (typeConfig.turretSpeedMultiplier);
+    }
+
     // Start crosshair in front of ship
     crosshairOffset = Vec2::fromAngle (angle) * config.crosshairStartDistance;
 }
@@ -45,6 +59,11 @@ void Ship::update (float dt, Vec2 moveInput, Vec2 aimInput, bool fireInput, floa
     // Calculate damage penalty (up to configured reduction in speed and turning)
     float damagePercent = getDamagePercent();
     float damagePenalty = 1.0f - (damagePercent * config.shipDamagePenaltyMax);
+
+    // Get ship type multipliers
+    const auto& typeConfig = config.shipTypes[shipType];
+    float speedMult = typeConfig.speedMultiplier;
+    float turnMult = typeConfig.turnMultiplier;
 
     // Fire if requested (turrets handle their own reload timers)
     if (fireInput)
@@ -83,9 +102,9 @@ void Ship::update (float dt, Vec2 moveInput, Vec2 aimInput, bool fireInput, floa
         }
     }
 
-    // Apply throttle to velocity (reduced by damage)
+    // Apply throttle to velocity (reduced by damage, modified by ship type)
     Vec2 forward = Vec2::fromAngle (angle);
-    float effectiveMaxSpeed = config.shipMaxSpeed * damagePenalty;
+    float effectiveMaxSpeed = config.shipMaxSpeed * damagePenalty * speedMult;
     float effectiveThrottle = throttle;
     if (throttle < 0)
         effectiveThrottle = throttle * config.shipReverseSpeedMultiplier; // Reverse is slower
@@ -121,13 +140,13 @@ void Ship::update (float dt, Vec2 moveInput, Vec2 aimInput, bool fireInput, floa
         velocity = forward * currentSpeed;
     }
 
-    // Apply rudder to turning (only when moving, reduced by damage)
+    // Apply rudder to turning (only when moving, reduced by damage, modified by ship type)
     float speed = velocity.length();
     if (speed > 0.5f)
     {
         // Turn rate based on minimum turning radius
         // radius = speed / angularVelocity, so angularVelocity = speed / radius
-        float minTurnRadius = length * config.shipMinTurnRadiusMultiplier / damagePenalty; // Damaged ships turn wider
+        float minTurnRadius = length * config.shipMinTurnRadiusMultiplier / (damagePenalty * turnMult); // Damaged ships turn wider
         angularVelocity = rudder * speed / minTurnRadius;
     }
     else
@@ -166,18 +185,21 @@ void Ship::update (float dt, Vec2 moveInput, Vec2 aimInput, bool fireInput, floa
     else if (crosshairWorldPos.y > arenaHeight - margin)
         crosshairOffset.y = arenaHeight - margin - position.y;
 
-    // Clamp crosshair to max range
+    // Clamp crosshair to max range (ship-type dependent)
+    float maxRange = getMaxRange();
     float crosshairDist = crosshairOffset.length();
-    if (crosshairDist > config.maxShellRange)
-        crosshairOffset = crosshairOffset.normalized() * config.maxShellRange;
+    if (crosshairDist > maxRange)
+        crosshairOffset = crosshairOffset.normalized() * maxRange;
 
     // Update turrets to aim at crosshair from their individual positions
     crosshairWorldPos = position + crosshairOffset;
     float cosA = std::cos (angle);
     float sinA = std::sin (angle);
 
-    for (auto& turret : turrets)
+    int numTurrets = getNumTurrets();
+    for (int i = 0; i < numTurrets; ++i)
     {
+        auto& turret = turrets[i];
         Vec2 localOffset = turret.getLocalOffset();
         // Calculate turret world position
         Vec2 turretWorldPos;
@@ -345,8 +367,11 @@ bool Ship::fireShells()
     float shellSpeed = config.shipMaxSpeed * config.shellSpeedMultiplier;
     bool firedAny = false;
 
-    for (auto& turret : turrets)
+    int numTurrets = getNumTurrets();
+    for (int i = 0; i < numTurrets; ++i)
     {
+        auto& turret = turrets[i];
+
         // Only fire if turret is loaded and actually aimed at the target
         if (! turret.isLoaded() || ! turret.isAimedAtTarget())
             continue;
@@ -377,7 +402,7 @@ bool Ship::fireShells()
         Vec2 shellVel = Vec2::fromAngle (fireAngle) * shellSpeed
                       + velocity * config.shellShipVelocityFactor;
 
-        pendingShells.push_back (Shell (turretPos, shellVel, playerIndex, targetRange));
+        pendingShells.push_back (Shell (turretPos, shellVel, playerIndex, targetRange, getShellDamage()));
         turret.fire();
         firedAny = true;
     }
@@ -394,11 +419,12 @@ void Ship::setCrosshairPosition (Vec2 worldPos)
 {
     crosshairOffset = worldPos - position;
 
-    // Clamp to max range
+    // Clamp to max range (ship-type dependent)
+    float maxRange = getMaxRange();
     float dist = crosshairOffset.length();
-    if (dist > config.maxShellRange)
+    if (dist > maxRange)
     {
-        crosshairOffset = crosshairOffset.normalized() * config.maxShellRange;
+        crosshairOffset = crosshairOffset.normalized() * maxRange;
     }
 }
 
@@ -409,8 +435,9 @@ bool Ship::isReadyToFire() const
         return false;
 
     // Check if any turret is loaded and on target
-    for (const auto& turret : turrets)
-        if (turret.isLoaded() && turret.isOnTarget())
+    int numTurrets = getNumTurrets();
+    for (int i = 0; i < numTurrets; ++i)
+        if (turrets[i].isLoaded() && turrets[i].isOnTarget())
             return true;
 
     return false;
@@ -420,8 +447,9 @@ float Ship::getReloadProgress() const
 {
     // Return the progress of the slowest turret (minimum progress)
     float minProgress = 1.0f;
-    for (const auto& turret : turrets)
-        minProgress = std::min (minProgress, turret.getReloadProgress());
+    int numTurrets = getNumTurrets();
+    for (int i = 0; i < numTurrets; ++i)
+        minProgress = std::min (minProgress, turrets[i].getReloadProgress());
     return minProgress;
 }
 

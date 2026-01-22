@@ -13,6 +13,7 @@ bool Game::init()
     SetConfigFlags (FLAG_WINDOW_RESIZABLE | FLAG_MSAA_4X_HINT);
     InitWindow (WINDOW_WIDTH, WINDOW_HEIGHT, "Heligoland");
     SetTargetFPS (60);
+    SetExitKey (0);  // Disable raylib's default ESC-to-close behavior
     HideCursor();
 
     renderer = std::make_unique<Renderer>();
@@ -144,6 +145,48 @@ void Game::updateTitle (float dt)
     leftWasPressed = leftPressed;
     rightWasPressed = rightPressed;
 
+    // Ship selection with D-pad or face buttons for each connected player
+    static std::array<bool, MAX_PLAYERS> upWasPressed = {};
+    static std::array<bool, MAX_PLAYERS> downWasPressed = {};
+
+    for (int i = 0; i < MAX_PLAYERS; ++i)
+    {
+        if (!players[i]->isConnected())
+            continue;
+
+        bool upPressed = false;
+        bool downPressed = false;
+
+        if (IsGamepadAvailable (i))
+        {
+            // Use D-pad for ship selection
+            upPressed = IsGamepadButtonDown (i, GAMEPAD_BUTTON_LEFT_FACE_UP);
+            downPressed = IsGamepadButtonDown (i, GAMEPAD_BUTTON_LEFT_FACE_DOWN);
+        }
+
+        // Player 0 can also use keyboard
+        if (i == 0)
+        {
+            if (IsKeyDown (KEY_W))
+                upPressed = true;
+            if (IsKeyDown (KEY_S))
+                downPressed = true;
+        }
+
+        // Cycle ship selection with edge detection
+        if (upPressed && !upWasPressed[i])
+        {
+            playerShipSelection[i] = (playerShipSelection[i] + 1) % NUM_SHIP_TYPES;
+        }
+        if (downPressed && !downWasPressed[i])
+        {
+            playerShipSelection[i] = (playerShipSelection[i] + NUM_SHIP_TYPES - 1) % NUM_SHIP_TYPES;
+        }
+
+        upWasPressed[i] = upPressed;
+        downWasPressed[i] = downPressed;
+    }
+
     // Volume control with triggers (up/down keys or gamepad triggers)
     if (audio)
     {
@@ -169,7 +212,7 @@ void Game::updateTitle (float dt)
         }
 
         // Adjust volume on press (with edge detection)
-        if (volumeDownPressed && ! volumeDownWasPressed)
+        if (volumeDownWasPressed && ! volumeDownWasPressed)
             audio->setMasterVolume (audio->getMasterVolumeLevel() - 1);
         if (volumeUpPressed && ! volumeUpWasPressed)
             audio->setMasterVolume (audio->getMasterVolumeLevel() + 1);
@@ -213,12 +256,29 @@ void Game::startGame()
     // Create ships at starting positions
     bool isTeamMode = (gameMode == GameMode::Teams || gameMode == GameMode::Battle);
     int numShips = getNumShipsForMode();
-    float shipLength = renderer->getShipLength();
-    float shipWidth = renderer->getShipWidth();
+
     for (int i = 0; i < numShips; ++i)
     {
         int team = isTeamMode ? getTeam (i) : -1;
-        ships[i] = std::make_unique<Ship> (i, getShipStartPosition (i), getShipStartAngle (i), shipLength, shipWidth, team);
+
+        // Determine ship type: use player selection for humans, random for AI
+        int playerIdx = getPlayerIndexForShip (i);
+        int shipType;
+        if (playerIdx >= 0 && players[playerIdx]->isConnected())
+        {
+            // Human player - use their selection
+            shipType = playerShipSelection[playerIdx];
+        }
+        else
+        {
+            // AI - random ship type
+            shipType = rand() % NUM_SHIP_TYPES;
+        }
+
+        float shipLength = renderer->getShipLength (shipType);
+        float shipWidth = renderer->getShipWidth (shipType);
+
+        ships[i] = std::make_unique<Ship> (i, getShipStartPosition (i), getShipStartAngle (i), shipLength, shipWidth, team, shipType);
     }
 
     shells.clear();
@@ -471,7 +531,7 @@ void Game::checkCollisions()
                 float arenaWidth, arenaHeight;
                 getWindowSize (arenaWidth, arenaHeight);
 
-                ship->takeDamage (config.shellDamage);
+                ship->takeDamage (shell.getDamage());
 
                 // Spawn hit explosion
                 Explosion explosion;
@@ -744,7 +804,7 @@ void Game::renderTitle()
     getWindowSize (w, h);
 
     // Draw title
-    renderer->drawTextCentered ("HELIGOLAND", { w / 2.0f, h / 3.0f }, 8.0f, config.colorTitle);
+    renderer->drawTextCentered ("HELIGOLAND", { w / 2.0f, h * 0.15f }, 8.0f, config.colorTitle);
 
     // Draw connected players
     int connectedCount = 0;
@@ -757,7 +817,7 @@ void Game::renderTitle()
     }
 
     std::string playerText = std::to_string (connectedCount) + " PLAYERS CONNECTED";
-    renderer->drawTextCentered (playerText, { w / 2.0f, h * 0.45f }, 3.0f, config.colorSubtitle);
+    renderer->drawTextCentered (playerText, { w / 2.0f, h * 0.27f }, 3.0f, config.colorSubtitle);
 
     // Draw game mode selector
     std::string modeText;
@@ -771,54 +831,86 @@ void Game::renderTitle()
         modeText = "1 VS 1 VS 1";
     else
         modeText = "BATTLE 6 VS 6";
-    renderer->drawTextCentered (modeText, { w / 2.0f, h * 0.55f }, 4.0f, config.colorModeText);
+    renderer->drawTextCentered (modeText, { w / 2.0f, h * 0.35f }, 4.0f, config.colorModeText);
 
-    renderer->drawTextCentered ("LEFT - RIGHT TO CHANGE MODE", { w / 2.0f, h * 0.62f }, 1.5f, config.colorGreySubtle);
+    renderer->drawTextCentered ("LEFT - RIGHT TO CHANGE MODE", { w / 2.0f, h * 0.41f }, 1.5f, config.colorGreySubtle);
 
-    // Draw player slots (only show human-controllable slots)
+    // Draw ship selection section
+    renderer->drawTextCentered ("SELECT YOUR SHIP", { w / 2.0f, h * 0.48f }, 2.5f, config.colorSubtitle);
+
+    // Draw player slots with ship previews
     int numSlots = (gameMode == GameMode::Battle) ? MAX_PLAYERS : getNumShipsForMode();
-    float slotY = h * 0.72f;
-    float slotSpacing = 80.0f;
+    float slotY = h * 0.62f;
+    float slotSpacing = 140.0f;
+
+    // Helper to get player color
+    auto getPlayerColor = [this] (int playerIndex) -> Color
+    {
+        switch (playerIndex)
+        {
+            case 0: return config.colorShipRed;
+            case 1: return config.colorShipBlue;
+            case 2: return config.colorShipGreen;
+            case 3: return config.colorShipYellow;
+            default: return config.colorGrey;
+        }
+    };
 
     if (gameMode == GameMode::Teams || gameMode == GameMode::Battle)
     {
         // Battle mode: show 2 slots per team with team labels
-        float teamSpacing = 150.0f;
+        float teamSpacing = 200.0f;
         float startX = w / 2.0f - teamSpacing / 2.0f - slotSpacing / 2.0f;
 
         // Team 1 slots (players 0, 1)
-        renderer->drawTextCentered ("TEAM 1", { startX + slotSpacing / 2.0f, slotY - 45.0f }, 2.0f, config.colorShipRed);
+        renderer->drawTextCentered ("TEAM 1", { startX + slotSpacing / 2.0f, slotY - 70.0f }, 2.0f, config.colorTeam1);
         for (int i = 0; i < 2; ++i)
         {
             Vec2 slotPos = { startX + i * slotSpacing, slotY };
+            Color slotColor = getPlayerColor (i);
+
             if (players[i]->isConnected())
             {
-                Color slotColor = (i == 0) ? config.colorShipRed : config.colorShipBlue;
-                renderer->drawFilledRect ({ slotPos.x - 25, slotPos.y - 25 }, 50, 50, slotColor);
-                renderer->drawTextCentered ("P" + std::to_string (i + 1), slotPos, 3.0f, config.colorBlack);
+                // Draw ship preview (45 degrees) with player color on turrets
+                renderer->drawShipPreview (playerShipSelection[i], slotPos, -pi / 4.0f, i);
+
+                // Draw player label below
+                renderer->drawTextCentered ("P" + std::to_string (i + 1), { slotPos.x, slotPos.y + 50.0f }, 2.0f, slotColor);
+
+                // Draw ship type name
+                std::string shipName = config.shipTypes[playerShipSelection[i]].name;
+                renderer->drawTextCentered (shipName, { slotPos.x, slotPos.y + 70.0f }, 1.5f, config.colorGreyLight);
             }
             else
             {
-                renderer->drawRect ({ slotPos.x - 25, slotPos.y - 25 }, 50, 50, config.colorGreyDark);
+                renderer->drawRect ({ slotPos.x - 30, slotPos.y - 40 }, 60, 80, config.colorGreyDark);
                 renderer->drawTextCentered ("AI", slotPos, 2.0f, config.colorGreyDark);
             }
         }
 
         // Team 2 slots (players 2, 3)
         float team2StartX = w / 2.0f + teamSpacing / 2.0f - slotSpacing / 2.0f;
-        renderer->drawTextCentered ("TEAM 2", { team2StartX + slotSpacing / 2.0f, slotY - 45.0f }, 2.0f, config.colorShipBlue);
+        renderer->drawTextCentered ("TEAM 2", { team2StartX + slotSpacing / 2.0f, slotY - 70.0f }, 2.0f, config.colorTeam2);
         for (int i = 2; i < 4; ++i)
         {
             Vec2 slotPos = { team2StartX + (i - 2) * slotSpacing, slotY };
+            Color slotColor = getPlayerColor (i);
+
             if (players[i]->isConnected())
             {
-                Color slotColor = (i == 2) ? config.colorShipGreen : config.colorShipYellow;
-                renderer->drawFilledRect ({ slotPos.x - 25, slotPos.y - 25 }, 50, 50, slotColor);
-                renderer->drawTextCentered ("P" + std::to_string (i + 1), slotPos, 3.0f, config.colorBlack);
+                // Draw ship preview (45 degrees) with player color on turrets
+                renderer->drawShipPreview (playerShipSelection[i], slotPos, -pi / 4.0f, i);
+
+                // Draw player label below
+                renderer->drawTextCentered ("P" + std::to_string (i + 1), { slotPos.x, slotPos.y + 50.0f }, 2.0f, slotColor);
+
+                // Draw ship type name
+                std::string shipName = config.shipTypes[playerShipSelection[i]].name;
+                renderer->drawTextCentered (shipName, { slotPos.x, slotPos.y + 70.0f }, 1.5f, config.colorGreyLight);
             }
             else
             {
-                renderer->drawRect ({ slotPos.x - 25, slotPos.y - 25 }, 50, 50, config.colorGreyDark);
+                renderer->drawRect ({ slotPos.x - 30, slotPos.y - 40 }, 60, 80, config.colorGreyDark);
                 renderer->drawTextCentered ("AI", slotPos, 2.0f, config.colorGreyDark);
             }
         }
@@ -826,8 +918,8 @@ void Game::renderTitle()
         if (gameMode == GameMode::Battle)
         {
             // Show "+4 AI" indicators for each team
-            renderer->drawTextCentered ("+4 AI", { startX + slotSpacing / 2.0f, slotY + 45.0f }, 1.5f, config.colorGreySubtle);
-            renderer->drawTextCentered ("+4 AI", { team2StartX + slotSpacing / 2.0f, slotY + 45.0f }, 1.5f, config.colorGreySubtle);
+            renderer->drawTextCentered ("+4 AI", { startX + slotSpacing / 2.0f, slotY + 90.0f }, 1.5f, config.colorGreySubtle);
+            renderer->drawTextCentered ("+4 AI", { team2StartX + slotSpacing / 2.0f, slotY + 90.0f }, 1.5f, config.colorGreySubtle);
         }
     }
     else
@@ -837,51 +929,46 @@ void Game::renderTitle()
         for (int i = 0; i < numSlots; ++i)
         {
             Vec2 slotPos = { startX + i * slotSpacing, slotY };
-            Color slotColor;
+            Color slotColor = getPlayerColor (i);
 
             if (players[i]->isConnected())
             {
-                // Use player color
-                switch (i)
-                {
-                    case 0:
-                        slotColor = config.colorShipRed;
-                        break;
-                    case 1:
-                        slotColor = config.colorShipBlue;
-                        break;
-                    case 2:
-                        slotColor = config.colorShipGreen;
-                        break;
-                    case 3:
-                        slotColor = config.colorShipYellow;
-                        break;
-                    default:
-                        slotColor = config.colorGrey;
-                        break;
-                }
-                renderer->drawFilledRect ({ slotPos.x - 25, slotPos.y - 25 }, 50, 50, slotColor);
-                renderer->drawTextCentered ("P" + std::to_string (i + 1), slotPos, 3.0f, config.colorBlack);
+                // Draw ship preview (45 degrees) with player color on turrets
+                renderer->drawShipPreview (playerShipSelection[i], slotPos, -pi / 4.0f, i);
+
+                // Draw player label below
+                renderer->drawTextCentered ("P" + std::to_string (i + 1), { slotPos.x, slotPos.y + 50.0f }, 2.0f, slotColor);
+
+                // Draw ship type name
+                std::string shipName = config.shipTypes[playerShipSelection[i]].name;
+                renderer->drawTextCentered (shipName, { slotPos.x, slotPos.y + 70.0f }, 1.5f, config.colorGreyLight);
             }
             else
             {
-                slotColor = config.colorGreyDark;
-                renderer->drawRect ({ slotPos.x - 25, slotPos.y - 25 }, 50, 50, slotColor);
-                renderer->drawTextCentered ("AI", slotPos, 2.0f, slotColor);
+                renderer->drawRect ({ slotPos.x - 30, slotPos.y - 40 }, 60, 80, config.colorGreyDark);
+                renderer->drawTextCentered ("AI", slotPos, 2.0f, config.colorGreyDark);
             }
         }
     }
+
+    // Draw ship selection hint for connected players
+    bool anyConnected = false;
+    for (int i = 0; i < MAX_PLAYERS; ++i)
+        if (players[i]->isConnected())
+            anyConnected = true;
+
+    if (anyConnected)
+        renderer->drawTextCentered ("D-PAD UP - DOWN TO SELECT SHIP", { w / 2.0f, h * 0.82f }, 1.5f, config.colorGreySubtle);
 
     // Draw volume control
     if (audio)
     {
         std::string volumeText = "VOLUME: " + std::to_string (audio->getMasterVolumeLevel());
-        renderer->drawTextCentered (volumeText, { w / 2.0f, h * 0.82f }, 2.5f, config.colorSubtitle);
-        renderer->drawTextCentered ("UP - DOWN TO CHANGE VOLUME", { w / 2.0f, h * 0.87f }, 1.5f, config.colorGreySubtle);
+        renderer->drawTextCentered (volumeText, { w / 2.0f, h * 0.88f }, 2.0f, config.colorSubtitle);
     }
 
     // Draw start instruction
-    renderer->drawTextCentered ("CLICK OR PRESS ANY BUTTON TO START", { w / 2.0f, h * 0.94f }, 2.0f, config.colorInstruction);
+    renderer->drawTextCentered ("CLICK OR PRESS ANY BUTTON TO START", { w / 2.0f, h * 0.95f }, 2.0f, config.colorInstruction);
 }
 
 void Game::renderPlaying()

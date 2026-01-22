@@ -2,8 +2,39 @@
 
 #include "FileSystemWatcher.h"
 #include <raylib.h>
+#include <array>
 #include <memory>
 #include <string>
+#include <vector>
+
+// =============================================================================
+// Ship Type Definition
+// Each ship type has different turret configurations and stats
+// =============================================================================
+
+struct TurretConfig
+{
+    float localOffsetX = 0.0f;  // Position along ship length (positive = toward bow)
+    bool isFront = true;        // Front turrets can't point backward, rear can't point forward
+};
+
+struct ShipType
+{
+    std::string name;
+    int numTurrets = 4;
+    std::array<TurretConfig, 4> turrets;  // Up to 4 turrets
+
+    // Ship-specific stats (multipliers relative to base config values)
+    float healthMultiplier = 1.0f;
+    float speedMultiplier = 1.0f;
+    float turnMultiplier = 1.0f;
+    float reloadMultiplier = 1.0f;      // Lower = faster reload
+    float rangeMultiplier = 1.0f;       // Firing range multiplier
+    float damageMultiplier = 1.0f;      // Shell damage multiplier
+    float turretSpeedMultiplier = 1.0f; // Turret rotation speed multiplier
+};
+
+constexpr int NUM_SHIP_TYPES = 4;
 
 // =============================================================================
 // Game Configuration
@@ -220,6 +251,13 @@ public:
     Color colorWindBackground         = { 30, 30, 30, 200 };
     Color colorWindBorder             = { 100, 100, 100, 255 };
     Color colorWindArrow              = { 200, 200, 255, 255 };
+
+    // -------------------------------------------------------------------------
+    // Ship Types (4 types with 1-4 turrets)
+    // -------------------------------------------------------------------------
+    std::array<ShipType, NUM_SHIP_TYPES> shipTypes;
+
+    void initDefaultShipTypes();
 
 private:
     std::string getConfigPath() const;

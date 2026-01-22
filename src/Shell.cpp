@@ -1,7 +1,7 @@
 #include "Shell.h"
 
-Shell::Shell (Vec2 startPos, Vec2 vel, int owner, float range)
-    : position (startPos), velocity (vel), ownerIndex (owner)
+Shell::Shell (Vec2 startPos, Vec2 vel, int owner, float range, float dmg)
+    : position (startPos), velocity (vel), ownerIndex (owner), damage (dmg)
 {
     // Calculate flight time based on range and initial speed
     float speed = vel.length();

@@ -53,7 +53,7 @@ const Ship* AIController::findTarget (const Ship& myShip, const std::vector<cons
         return nullptr;
 
     Vec2 myPos = myShip.getPosition();
-    float firingRange = config.maxShellRange * personalityFactor;
+    float firingRange = myShip.getMaxRange() * personalityFactor;
 
     // Separate enemies into in-range and out-of-range
     std::vector<const Ship*> inRange;
@@ -201,9 +201,10 @@ void AIController::updateMovement (float dt, const Ship& myShip, const std::vect
         {
             Vec2 toTarget = target->getPosition() - myPos;
             float dist = toTarget.length();
+            float myRange = myShip.getMaxRange();
 
             // Get close but not too close (stay at half firing range)
-            float idealDist = config.maxShellRange * 0.5f * personalityFactor;
+            float idealDist = myRange * 0.5f * personalityFactor;
             if (dist > idealDist)
             {
                 desiredDir = toTarget.normalized();
@@ -227,6 +228,7 @@ void AIController::updateMovement (float dt, const Ship& myShip, const std::vect
             Vec2 toEnemy = target->getPosition() - myPos;
             float dist = toEnemy.length();
             float enemyAngle = target->getAngle();
+            float myRange = myShip.getMaxRange();
 
             // Calculate if we're in the enemy's firing arc (front 180 degrees)
             Vec2 enemyForward = Vec2::fromAngle (enemyAngle);
@@ -235,11 +237,11 @@ void AIController::updateMovement (float dt, const Ship& myShip, const std::vect
             bool inEnemyFiringArc = dotProduct > 0.0f;  // Enemy can see us
 
             // Ideal distance - stay just inside our max range, but outside if enemy is aiming at us
-            float idealDist = config.maxShellRange * 0.9f * personalityFactor;
-            if (inEnemyFiringArc && dist < config.maxShellRange * personalityFactor)
+            float idealDist = myRange * 0.9f * personalityFactor;
+            if (inEnemyFiringArc && dist < myRange * personalityFactor)
             {
                 // Enemy can shoot at us - prefer to stay further back
-                idealDist = config.maxShellRange * 1.05f * personalityFactor;
+                idealDist = myRange * 1.05f * personalityFactor;
             }
 
             float tolerance = 40.0f * personalityFactor;
@@ -254,7 +256,7 @@ void AIController::updateMovement (float dt, const Ship& myShip, const std::vect
                 perpendicular = perpendicular * -1.0f;
 
             // Start broadside approach at 1.2x firing range
-            float broadsideStartDist = config.maxShellRange * 1.2f * personalityFactor;
+            float broadsideStartDist = myRange * 1.2f * personalityFactor;
 
             if (dist < idealDist - tolerance)
             {

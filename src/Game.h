@@ -73,6 +73,9 @@ private:
     std::vector<Shell> shells;
     std::vector<Explosion> explosions;
 
+    // Ship selection for each player (0-3 = ship types with 1-4 turrets)
+    std::array<int, MAX_PLAYERS> playerShipSelection = { 3, 3, 3, 3 };  // Default to battleship
+
     // Wind system
     Vec2 wind; // Current wind direction and strength (length = strength 0-1)
     Vec2 targetWind; // Wind is slowly moving toward this target

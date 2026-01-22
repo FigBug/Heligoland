@@ -4,7 +4,7 @@
 #include <cmath>
 
 Turret::Turret (Vec2 localOffset_, bool isFrontTurret)
-    : localOffset (localOffset_), isFront (isFrontTurret)
+    : localOffset (localOffset_), isFront (isFrontTurret), reloadTime (config.fireInterval)
 {
     // Angle is relative to ship: 0 = ship forward, PI = ship backward
     // Front turrets start facing forward, rear turrets start facing backward
@@ -18,6 +18,11 @@ Turret::Turret (Vec2 localOffset_, bool isFrontTurret)
         angle = pi;
         targetAngle = pi;
     }
+}
+
+void Turret::fire()
+{
+    fireTimer = reloadTime;
 }
 
 float Turret::clampAngleToArc (float desiredAngle) const
@@ -92,7 +97,7 @@ void Turret::update (float dt, float shipAngle, Vec2 targetDir)
         targetAngle = clampAngleToArc (relativeAngle);
     }
 
-    float maxRotation = config.turretRotationSpeed * dt;
+    float maxRotation = config.turretRotationSpeed * rotationSpeedMultiplier * dt;
     float arcSize = pi * config.turretArcSize;
     float limit = pi - arcSize; // The forbidden zone boundary
 

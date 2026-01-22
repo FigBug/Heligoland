@@ -19,8 +19,10 @@ public:
 
     // Reload
     bool isLoaded() const { return fireTimer <= 0; }
-    float getReloadProgress() const { return 1.0f - (fireTimer / config.fireInterval); }
-    void fire() { fireTimer = config.fireInterval; }
+    float getReloadProgress() const { return reloadTime > 0 ? 1.0f - (fireTimer / reloadTime) : 1.0f; }
+    void fire();
+    void setReloadMultiplier (float mult) { reloadTime = config.fireInterval * mult; }
+    void setRotationSpeedMultiplier (float mult) { rotationSpeedMultiplier = mult; }
 
 private:
     Vec2 localOffset; // Position relative to ship center
@@ -29,6 +31,8 @@ private:
     float desiredAngle = 0.0f; // Original unclamped desired angle
     bool isFront = true; // Front turrets can't point backward, rear can't point forward
     float fireTimer = 0.0f; // Time until turret can fire again
+    float reloadTime = 15.0f; // Reload time for this turret (can be modified by ship type)
+    float rotationSpeedMultiplier = 1.0f; // Rotation speed multiplier (can be modified by ship type)
 
     float clampAngleToArc (float desiredAngle) const;
     bool isAtArcLimit() const; // Returns true if turret is at rotation limit

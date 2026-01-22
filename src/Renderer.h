@@ -38,8 +38,11 @@ public:
     void drawTextCentered (const std::string& text, Vec2 center, float scale, Color color);
 
     // Ship dimensions from loaded textures
-    float getShipLength() const;
-    float getShipWidth() const;
+    float getShipLength (int shipType = 3) const;  // Default to battleship (type 4, index 3)
+    float getShipWidth (int shipType = 3) const;
+
+    // Draw ship selection preview
+    void drawShipPreview (int shipType, Vec2 position, float angle, int playerIndex = 0);
 
     // Pixel-perfect hit testing
     bool checkShipHit (const Ship& ship, Vec2 worldPos) const;
@@ -51,15 +54,16 @@ private:
     void drawFilledOval (Vec2 center, float width, float height, float angle, Color color);
     void drawFilledCircle (Vec2 center, float radius, Color color);
     void drawChar (char c, Vec2 position, float scale, Color color);
-    int getShipTextureIndex (const Ship& ship) const;
+    int getShipColorIndex (const Ship& ship) const;  // Returns color index (0-3) based on team/player
 
     Texture2D noiseTexture1 = { 0 };
     Texture2D noiseTexture2 = { 0 };
     static constexpr int noiseTextureSize = 128;
 
-    // Ship textures: 0=Blue, 1=Red, 2=Green, 3=Yellow
-    Texture2D shipHullTextures[4] = {};
-    Texture2D shipTurretTextures[4] = {};
-    Image shipHullImages[4] = {};  // Keep images for pixel-perfect hit testing
+    // Ship hull textures by type (0=1turret, 1=2turret, 2=3turret, 3=4turret)
+    static constexpr int NUM_SHIP_TYPES = 4;
+    Texture2D shipHullTextures[NUM_SHIP_TYPES] = {};
+    Texture2D shipTurretTextures[NUM_SHIP_TYPES] = {};
+    Image shipHullImages[NUM_SHIP_TYPES] = {};  // Keep images for pixel-perfect hit testing
     bool shipTexturesLoaded = false;
 };

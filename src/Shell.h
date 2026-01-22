@@ -6,7 +6,7 @@
 class Shell
 {
 public:
-    Shell (Vec2 startPos, Vec2 velocity, int ownerIndex, float maxRange);
+    Shell (Vec2 startPos, Vec2 velocity, int ownerIndex, float maxRange, float damage);
 
     void update (float dt, Vec2 windDrift);
 
@@ -15,6 +15,7 @@ public:
     int getOwnerIndex() const { return ownerIndex; }
     float getRadius() const { return config.shellRadius; }
     float getSplashRadius() const { return config.shellSplashRadius; }
+    float getDamage() const { return damage; }
     bool isAlive() const { return alive; }
     bool hasLanded() const { return landed; } // True when shell reaches target range
     void kill() { alive = false; }
@@ -23,6 +24,7 @@ private:
     Vec2 position;
     Vec2 velocity;
     int ownerIndex; // Which player fired this shell
+    float damage;   // Damage this shell deals on hit
     bool alive = true;
     bool landed = false; // True when shell reaches target range
     float flightTime = 0.0f;    // Time shell has been in flight

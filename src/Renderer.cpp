@@ -78,7 +78,7 @@ Renderer::~Renderer()
         UnloadTexture (noiseTexture2);
 
     // Unload ship textures and images
-    for (int i = 0; i < 4; ++i)
+    for (int i = 0; i < NUM_SHIP_TYPES; ++i)
     {
         if (shipHullTextures[i].id != 0)
             UnloadTexture (shipHullTextures[i]);
@@ -154,22 +154,22 @@ void Renderer::drawShip (const Ship& ship)
 
     // Draw firing range circle (very faint white) - only for non-sinking ships
     if (ship.isAlive())
-        drawFilledCircle (pos, config.maxShellRange, config.colorFiringRange);
+        drawFilledCircle (pos, ship.getMaxRange(), config.colorFiringRange);
 
     // Calculate alpha for sinking ships
     float alpha = 1.0f;
     if (ship.isSinking())
         alpha = 1.0f - ship.getSinkProgress();
 
-    // Apply alpha to tint color
+    // Apply alpha for sinking ships (no color tint - ships have their own colors baked in)
     Color tint = { 255, 255, 255, (unsigned char) (255 * alpha) };
 
-    int texIdx = getShipTextureIndex (ship);
+    int shipType = ship.getShipType();
 
-    if (shipTexturesLoaded && shipHullTextures[texIdx].id != 0)
+    if (shipTexturesLoaded && shipHullTextures[shipType].id != 0)
     {
-        // Draw hull using texture at its natural size
-        Texture2D& hullTex = shipHullTextures[texIdx];
+        // Draw hull using texture at its natural size (already scaled on load)
+        Texture2D& hullTex = shipHullTextures[shipType];
 
         float hullWidth = (float) hullTex.width;
         float hullHeight = (float) hullTex.height;
@@ -186,24 +186,18 @@ void Renderer::drawShip (const Ship& ship)
         DrawTexturePro (hullTex, source, dest, origin, angleDeg, tint);
 
         // Draw turrets using textures at their natural size
-        // Turret positions from bottom of hull image (bow is at top)
-        // Order: front, front-mid, rear-mid, rear
-        float turretFromBottom[4] = { 74.0f, 67.0f, 23.0f, 13.0f };
-        float hullCenter = hullHeight / 2.0f;
-        float turretOffsets[4];
-        for (int i = 0; i < 4; ++i)
-            turretOffsets[i] = turretFromBottom[i] - hullCenter;
-
         float cosA = std::cos (angle);
         float sinA = std::sin (angle);
 
         const auto& turrets = ship.getTurrets();
-        for (int i = 0; i < 4; ++i)
+        int numTurrets = ship.getNumTurrets();
+
+        for (int i = 0; i < numTurrets; ++i)
         {
             const auto& turret = turrets[i];
 
-            // Local offset along ship's forward axis (X in ship coords)
-            Vec2 localOffset = { turretOffsets[i], 0.0f };
+            // Get turret position from ship's turret config
+            Vec2 localOffset = turret.getLocalOffset();
 
             // Rotate local offset by ship angle
             Vec2 worldOffset;
@@ -212,22 +206,31 @@ void Renderer::drawShip (const Ship& ship)
 
             Vec2 turretPos = pos + worldOffset;
 
-            if (shipTurretTextures[texIdx].id != 0)
+            if (shipTurretTextures[shipType].id != 0)
             {
-                Texture2D& turretTex = shipTurretTextures[texIdx];
+                Texture2D& turretTex = shipTurretTextures[shipType];
 
                 float turretWidth = (float) turretTex.width;
                 float turretHeight = (float) turretTex.height;
 
                 Rectangle turretSource = { 0, 0, turretWidth, turretHeight };
                 Rectangle turretDest = { turretPos.x, turretPos.y, turretWidth, turretHeight };
-                Vector2 turretOrigin = { 5.0f, 11.0f };
+                Vector2 turretOrigin = { turretWidth / 2.0f, turretHeight / 2.0f };
 
                 // Turret angle, add 90 to rotate from up-pointing image
                 float turretAngle = turret.getWorldAngle (angle);
                 float turretAngleDeg = turretAngle * (180.0f / pi) + 90.0f;
 
-                DrawTexturePro (turretTex, turretSource, turretDest, turretOrigin, turretAngleDeg, tint);
+                // Tint turrets with player color so users can identify their ship (subtle blend with white)
+                Color shipColor = ship.getColor();
+                float blend = 0.5f; // 0 = white, 1 = full color
+                Color turretTint = {
+                    (unsigned char) (255 * (1 - blend) + shipColor.r * blend),
+                    (unsigned char) (255 * (1 - blend) + shipColor.g * blend),
+                    (unsigned char) (255 * (1 - blend) + shipColor.b * blend),
+                    tint.a
+                };
+                DrawTexturePro (turretTex, turretSource, turretDest, turretOrigin, turretAngleDeg, turretTint);
             }
         }
     }
@@ -364,14 +367,15 @@ void Renderer::drawCrosshair (const Ship& ship)
     Color reloadColor = reloadPct >= 1.0f ? config.colorReloadReady : config.colorReloadNotReady;
     drawFilledRect ({ position.x - barWidth / 2.0f, barY }, barWidth * reloadPct, barHeight, reloadColor);
 
-    // Draw 4 turret indicator circles below reload bar
+    // Draw turret indicator circles below reload bar (only for actual turrets)
+    int numTurrets = ship.getNumTurrets();
     float circleY = barY + barHeight + 6.0f;
     float circleRadius = 4.0f;
     float circleSpacing = 12.0f;
-    float startX = position.x - 1.5f * circleSpacing;
+    float startX = position.x - (numTurrets - 1) * circleSpacing / 2.0f;
 
     const auto& turrets = ship.getTurrets();
-    for (int i = 0; i < 4; ++i)
+    for (int i = 0; i < numTurrets; ++i)
     {
         Vec2 circlePos = { startX + i * circleSpacing, circleY };
         bool isReady = turrets[i].isLoaded() && turrets[i].isAimedAtTarget();
@@ -408,7 +412,7 @@ void Renderer::drawShipHUD (const Ship& ship, int slot, int totalSlots, float sc
     float labelScale = hudWidth < 120.0f ? 1.5f : 2.0f;
     drawText (label, { x + 3, y + 3 }, labelScale, shipColor);
 
-    // Speed in knots
+    // Speed in knots (actual speed - faster ships show higher knots)
     float speedKnots = (ship.getSpeed() / config.shipMaxSpeed) * config.shipFullSpeedKnots;
     std::string speedText = std::to_string ((int) std::round (speedKnots)) + "KT";
     Color speedColor = { config.colorGreyLight.r, config.colorGreyLight.g, config.colorGreyLight.b, a };
@@ -803,61 +807,85 @@ void Renderer::createNoiseTexture()
 
 void Renderer::loadShipTextures()
 {
-    const char* hullPaths[4] = {
-        "assets/RED_ship_HULL.png",
-        "assets/BLUE_ship_HULL.png",
-        "assets/GREEN_ship_HULL.png",
-        "assets/YELLOW_ship_HULL.png"
+    // Scale factor applied to all ship textures on load
+    const float shipTextureScale = 0.25f;
+
+    // New ship textures: ship1.png (1 turret) through ship4.png (4 turrets)
+    const char* hullPaths[NUM_SHIP_TYPES] = {
+        "assets/ships/ship1.png",
+        "assets/ships/ship2.png",
+        "assets/ships/ship3.png",
+        "assets/ships/ship4.png"
     };
 
-    const char* turretPaths[4] = {
-        "assets/RED_ship_TURRET.png",
-        "assets/BLUE_ship_TURRET.png",
-        "assets/GREEN_ship_TURRET.png",
-        "assets/YELLOW_ship_TURRET.png"
+    const char* turretPaths[NUM_SHIP_TYPES] = {
+        "assets/ships/turret1.png",
+        "assets/ships/turret2.png",
+        "assets/ships/turret3.png",
+        "assets/ships/turret4.png"
     };
 
     shipTexturesLoaded = true;
 
-    for (int i = 0; i < 4; ++i)
+    for (int i = 0; i < NUM_SHIP_TYPES; ++i)
     {
-        // Load hull image and keep it for pixel-perfect hit testing
-        shipHullImages[i] = LoadImage (getResourcePath (hullPaths[i]).c_str());
-        if (shipHullImages[i].data != nullptr)
+        // Load hull image, scale it, and keep for pixel-perfect hit testing
+        Image hullImage = LoadImage (getResourcePath (hullPaths[i]).c_str());
+        if (hullImage.data != nullptr)
         {
+            int newWidth = (int) (hullImage.width * shipTextureScale);
+            int newHeight = (int) (hullImage.height * shipTextureScale);
+            ImageResize (&hullImage, newWidth, newHeight);
+
+            shipHullImages[i] = hullImage;
             shipHullTextures[i] = LoadTextureFromImage (shipHullImages[i]);
             SetTextureFilter (shipHullTextures[i], TEXTURE_FILTER_BILINEAR);
         }
         else
         {
+            TraceLog (LOG_WARNING, "Failed to load ship hull texture: %s", hullPaths[i]);
             shipTexturesLoaded = false;
         }
 
-        shipTurretTextures[i] = LoadTexture (getResourcePath (turretPaths[i]).c_str());
-        if (shipTurretTextures[i].id == 0)
-            shipTexturesLoaded = false;
-        else
+        // Load turret image and scale it
+        Image turretImage = LoadImage (getResourcePath (turretPaths[i]).c_str());
+        if (turretImage.data != nullptr)
+        {
+            int newWidth = (int) (turretImage.width * shipTextureScale);
+            int newHeight = (int) (turretImage.height * shipTextureScale);
+            ImageResize (&turretImage, newWidth, newHeight);
+
+            shipTurretTextures[i] = LoadTextureFromImage (turretImage);
             SetTextureFilter (shipTurretTextures[i], TEXTURE_FILTER_BILINEAR);
+            UnloadImage (turretImage);
+        }
+        else
+        {
+            TraceLog (LOG_WARNING, "Failed to load ship turret texture: %s", turretPaths[i]);
+            shipTexturesLoaded = false;
+        }
     }
 }
 
-float Renderer::getShipLength() const
+float Renderer::getShipLength (int shipType) const
 {
     // Ship length is the hull texture height (bow points up in image)
-    if (shipTexturesLoaded && shipHullTextures[0].id != 0)
-        return (float) shipHullTextures[0].height;
-    return 0.0f; // Fallback
+    int idx = std::clamp (shipType, 0, NUM_SHIP_TYPES - 1);
+    if (shipTexturesLoaded && shipHullTextures[idx].id != 0)
+        return (float) shipHullTextures[idx].height;
+    return 100.0f; // Fallback
 }
 
-float Renderer::getShipWidth() const
+float Renderer::getShipWidth (int shipType) const
 {
     // Ship width is the hull texture width
-    if (shipTexturesLoaded && shipHullTextures[0].id != 0)
-        return (float) shipHullTextures[0].width;
-    return 0.0f; // Fallback
+    int idx = std::clamp (shipType, 0, NUM_SHIP_TYPES - 1);
+    if (shipTexturesLoaded && shipHullTextures[idx].id != 0)
+        return (float) shipHullTextures[idx].width;
+    return 25.0f; // Fallback
 }
 
-int Renderer::getShipTextureIndex (const Ship& ship) const
+int Renderer::getShipColorIndex (const Ship& ship) const
 {
     int team = ship.getTeam();
     if (team >= 0)
@@ -867,12 +895,85 @@ int Renderer::getShipTextureIndex (const Ship& ship) const
     return std::clamp (ship.getPlayerIndex(), 0, 3);
 }
 
+void Renderer::drawShipPreview (int shipType, Vec2 position, float angle, int playerIndex)
+{
+    int idx = std::clamp (shipType, 0, NUM_SHIP_TYPES - 1);
+
+    if (!shipTexturesLoaded || shipHullTextures[idx].id == 0)
+        return;
+
+    Texture2D& hullTex = shipHullTextures[idx];
+
+    float hullWidth = (float) hullTex.width;
+    float hullHeight = (float) hullTex.height;
+
+    Rectangle source = { 0, 0, hullWidth, hullHeight };
+    Rectangle dest = { position.x, position.y, hullWidth, hullHeight };
+
+    Vector2 origin = { hullWidth / 2.0f, hullHeight / 2.0f };
+    float angleDeg = angle * (180.0f / pi) + 90.0f;
+
+    DrawTexturePro (hullTex, source, dest, origin, angleDeg, WHITE);
+
+    // Get player color for turret tinting (subtle blend with white)
+    Color shipColor;
+    switch (playerIndex)
+    {
+        case 0: shipColor = config.colorShipRed; break;
+        case 1: shipColor = config.colorShipBlue; break;
+        case 2: shipColor = config.colorShipGreen; break;
+        case 3: shipColor = config.colorShipYellow; break;
+        default: shipColor = WHITE; break;
+    }
+    float blend = 0.5f; // 0 = white, 1 = full color
+    Color turretTint = {
+        (unsigned char) (255 * (1 - blend) + shipColor.r * blend),
+        (unsigned char) (255 * (1 - blend) + shipColor.g * blend),
+        (unsigned char) (255 * (1 - blend) + shipColor.b * blend),
+        255
+    };
+
+    // Draw turrets at their default positions
+    int numTurrets = config.shipTypes[idx].numTurrets;
+    float cosA = std::cos (angle);
+    float sinA = std::sin (angle);
+
+    if (shipTurretTextures[idx].id != 0)
+    {
+        Texture2D& turretTex = shipTurretTextures[idx];
+        float turretWidth = (float) turretTex.width;
+        float turretHeight = (float) turretTex.height;
+
+        for (int i = 0; i < numTurrets; ++i)
+        {
+            // Get turret position from config
+            float offsetPct = config.shipTypes[idx].turrets[i].localOffsetX;
+            float localX = offsetPct * hullHeight;
+
+            Vec2 worldOffset;
+            worldOffset.x = localX * cosA;
+            worldOffset.y = localX * sinA;
+
+            Vec2 turretPos = position + worldOffset;
+
+            Rectangle turretSource = { 0, 0, turretWidth, turretHeight };
+            Rectangle turretDest = { turretPos.x, turretPos.y, turretWidth, turretHeight };
+            Vector2 turretOrigin = { turretWidth / 2.0f, turretHeight / 2.0f };
+
+            // Front turrets point forward, rear turrets point backward
+            bool isFront = config.shipTypes[idx].turrets[i].isFront;
+            float turretAngleDeg = isFront ? angleDeg : angleDeg + 180.0f;
+            DrawTexturePro (turretTex, turretSource, turretDest, turretOrigin, turretAngleDeg, turretTint);
+        }
+    }
+}
+
 bool Renderer::checkShipHit (const Ship& ship, Vec2 worldPos) const
 {
     if (!shipTexturesLoaded)
         return true; // Fallback to always hit if no textures
 
-    int texIdx = getShipTextureIndex (ship);
+    int texIdx = ship.getShipType();
     const Image& img = shipHullImages[texIdx];
     if (img.data == nullptr)
         return true; // Fallback
@@ -914,7 +1015,7 @@ bool Renderer::checkShipCollision (const Ship& shipA, const Ship& shipB, Vec2& c
     if (!shipTexturesLoaded)
         return false;
 
-    int texIdxA = getShipTextureIndex (shipA);
+    int texIdxA = shipA.getShipType();
     const Image& imgA = shipHullImages[texIdxA];
     if (imgA.data == nullptr)
         return false;

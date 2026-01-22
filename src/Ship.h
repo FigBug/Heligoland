@@ -27,7 +27,7 @@ struct Smoke
 class Ship
 {
 public:
-    Ship (int playerIndex, Vec2 startPos, float startAngle, float shipLength, float shipWidth, int team = -1);  // team: -1=FFA, 0=team1, 1=team2
+    Ship (int playerIndex, Vec2 startPos, float startAngle, float shipLength, float shipWidth, int team = -1, int shipType = 3);  // team: -1=FFA, 0=team1, 1=team2; shipType: 0-3
 
     void update (float dt, Vec2 moveInput, Vec2 aimInput, bool fireInput, float arenaWidth, float arenaHeight, Vec2 wind);
 
@@ -35,27 +35,33 @@ public:
     float getAngle() const                          { return angle; }
     float getLength() const                         { return length; }
     float getWidth() const                          { return width; }
-    float getMaxSpeed() const                       { return config.shipMaxSpeed; }
+    float getMaxSpeed() const                       { return config.shipMaxSpeed * config.shipTypes[shipType].speedMultiplier; }
     int getPlayerIndex() const                      { return playerIndex; }
     int getTeam() const                             { return team; }  // -1=FFA, 0=team1, 1=team2
+    int getShipType() const                         { return shipType; }  // 0-3 (1-4 turrets)
+    int getNumTurrets() const                       { return config.shipTypes[shipType].numTurrets; }
     const std::array<Turret, 4>& getTurrets() const { return turrets; }
     Vec2 getCrosshairPosition() const               { return position + crosshairOffset; }
     void setCrosshairPosition (Vec2 worldPos);  // For mouse aiming
     const std::vector<Bubble>& getBubbles() const   { return bubbles; }
     const std::vector<Smoke>& getSmoke() const      { return smoke; }
-    float getDamagePercent() const                  { return 1.0f - (health / config.shipMaxHealth); }
+    float getDamagePercent() const                  { return 1.0f - (health / getMaxHealth()); }
     std::vector<Shell>& getPendingShells()          { return pendingShells; }
     Color getColor() const;
 
     // Health system
     float getHealth() const         { return health; }
-    float getMaxHealth() const      { return config.shipMaxHealth; }
+    float getMaxHealth() const      { return config.shipMaxHealth * config.shipTypes[shipType].healthMultiplier; }
     bool isAlive() const            { return health > 0; }
     bool isVisible() const          { return isAlive() || isSinking(); }
     bool isSinking() const          { return sinking && sinkTimer < config.shipSinkDuration; }
     bool isFullySunk() const        { return sinking && sinkTimer >= config.shipSinkDuration; }
     float getSinkProgress() const   { return sinking ? sinkTimer / config.shipSinkDuration : 0.0f; }
     void takeDamage (float damage);
+
+    // Combat stats
+    float getMaxRange() const       { return config.maxShellRange * config.shipTypes[shipType].rangeMultiplier; }
+    float getShellDamage() const    { return config.shellDamage * config.shipTypes[shipType].damageMultiplier; }
 
     // Collision
     Vec2 getVelocity() const        { return velocity; }
@@ -74,6 +80,7 @@ public:
 private:
     int playerIndex;
     int team;  // -1=FFA, 0=team1, 1=team2
+    int shipType;  // 0-3 (determines turret count and stats)
     Vec2 position;
     Vec2 velocity;
     float angle = 0.0f; // Ship facing direction (radians)
@@ -95,8 +102,8 @@ private:
     std::vector<Smoke> smoke;
     float smokeSpawnTimer = 0.0f;
 
-    // Health
-    float health = config.shipMaxHealth;
+    // Health (initialized in constructor based on ship type)
+    float health;
 
     // Sinking
     bool sinking = false;
