@@ -71,20 +71,24 @@ void Config::initDefaultShipTypes()
     // Ship Type 1: Scout - 1 turret, fast but fragile, short range, low damage
     shipTypes[0].name = "Scout";
     shipTypes[0].numTurrets = 1;
-    shipTypes[0].turrets[0] = { 0.15f, true };  // Single front turret
+    shipTypes[0].turrets[0] = { 0.24f, true };  // Single front turret
+    shipTypes[0].numSmokeStacks = 1;
+    shipTypes[0].smokeStackOffsets = { -0.10f, 0.0f };  // Single stack behind center
     shipTypes[0].healthMultiplier = 0.6f;
-    shipTypes[0].speedMultiplier = 1.3f;
-    shipTypes[0].turnMultiplier = 1.3f;
-    shipTypes[0].reloadMultiplier = 0.7f;       // Faster reload
-    shipTypes[0].rangeMultiplier = 0.7f;        // Short range
+    shipTypes[0].speedMultiplier = 1.4f;
+    shipTypes[0].turnMultiplier = 1.25f;
+    shipTypes[0].reloadMultiplier = 0.5f;       // Faster reload
+    shipTypes[0].rangeMultiplier = 0.65f;        // Short range
     shipTypes[0].damageMultiplier = 0.6f;       // Low damage
-    shipTypes[0].turretSpeedMultiplier = 1.3f;  // Fast turret
+    shipTypes[0].turretSpeedMultiplier = 1.4f;  // Fast turret
 
     // Ship Type 2: Frigate - 2 turrets, balanced
     shipTypes[1].name = "Frigate";
     shipTypes[1].numTurrets = 2;
-    shipTypes[1].turrets[0] = { 0.18f, true };   // Front turret
-    shipTypes[1].turrets[1] = { -0.32f, false }; // Rear turret
+    shipTypes[1].turrets[0] = { 0.19f, true };   // Front turret
+    shipTypes[1].turrets[1] = { -0.41f, false }; // Rear turret
+    shipTypes[1].numSmokeStacks = 1;
+    shipTypes[1].smokeStackOffsets = { -0.10f, 0.0f };  // Single stack behind center
     shipTypes[1].healthMultiplier = 0.8f;
     shipTypes[1].speedMultiplier = 1.15f;
     shipTypes[1].turnMultiplier = 1.15f;
@@ -96,9 +100,11 @@ void Config::initDefaultShipTypes()
     // Ship Type 3: Cruiser - 3 turrets, standard
     shipTypes[2].name = "Cruiser";
     shipTypes[2].numTurrets = 3;
-    shipTypes[2].turrets[0] = { 0.22f, true };   // Front
-    shipTypes[2].turrets[1] = { 0.05f, true };   // Mid (front-facing)
-    shipTypes[2].turrets[2] = { -0.30f, false }; // Rear
+    shipTypes[2].turrets[0] = { 0.28f, true };   // Front
+    shipTypes[2].turrets[1] = { 0.17f, true };   // Mid (front-facing)
+    shipTypes[2].turrets[2] = { -0.350f, false }; // Rear
+    shipTypes[2].numSmokeStacks = 2;
+    shipTypes[2].smokeStackOffsets = { 0.05f, -0.05f };  // Two stacks near center
     shipTypes[2].healthMultiplier = 1.0f;
     shipTypes[2].speedMultiplier = 1.0f;
     shipTypes[2].turnMultiplier = 1.0f;
@@ -110,10 +116,12 @@ void Config::initDefaultShipTypes()
     // Ship Type 4: Battleship - 4 turrets, slow but powerful, long range, high damage
     shipTypes[3].name = "Battleship";
     shipTypes[3].numTurrets = 4;
-    shipTypes[3].turrets[0] = { 0.28f, true };   // Front
-    shipTypes[3].turrets[1] = { 0.15f, true };   // Front-mid
-    shipTypes[3].turrets[2] = { -0.15f, false }; // Rear-mid
-    shipTypes[3].turrets[3] = { -0.30f, false }; // Rear
+    shipTypes[3].turrets[0] = { 0.29f, true };   // Front
+    shipTypes[3].turrets[1] = { 0.185f, true };   // Front-mid
+    shipTypes[3].turrets[2] = { -0.28f, false }; // Rear-mid
+    shipTypes[3].turrets[3] = { -0.41f, false }; // Rear
+    shipTypes[3].numSmokeStacks = 2;
+    shipTypes[3].smokeStackOffsets = { 0.08f, -0.04f };  // Two stacks near center
     shipTypes[3].healthMultiplier = 1.25f;
     shipTypes[3].speedMultiplier = 0.8f;
     shipTypes[3].turnMultiplier = 0.8f;

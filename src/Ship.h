@@ -57,11 +57,13 @@ public:
     bool isSinking() const          { return sinking && sinkTimer < config.shipSinkDuration; }
     bool isFullySunk() const        { return sinking && sinkTimer >= config.shipSinkDuration; }
     float getSinkProgress() const   { return sinking ? sinkTimer / config.shipSinkDuration : 0.0f; }
-    void takeDamage (float damage);
+    void takeDamage (float damage, Vec2 hitWorldPos = { 0, 0 });
 
     // Combat stats
     float getMaxRange() const       { return config.maxShellRange * config.shipTypes[shipType].rangeMultiplier; }
     float getShellDamage() const    { return config.shellDamage * config.shipTypes[shipType].damageMultiplier; }
+    float getDamageDealt() const    { return damageDealt; }
+    void addDamageDealt (float damage) { damageDealt += damage; }
 
     // Collision
     Vec2 getVelocity() const        { return velocity; }
@@ -102,8 +104,14 @@ private:
     std::vector<Smoke> smoke;
     float smokeSpawnTimer = 0.0f;
 
+    // Hit locations in local ship coordinates (for damage smoke)
+    std::vector<Vec2> hitLocations;
+
     // Health (initialized in constructor based on ship type)
     float health;
+
+    // Damage tracking
+    float damageDealt = 0.0f;
 
     // Sinking
     bool sinking = false;

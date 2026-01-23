@@ -221,6 +221,19 @@ void Game::updateTitle (float dt)
         volumeUpWasPressed = volumeUpPressed;
     }
 
+    // Randomly cycle AI ship selections
+    aiShipChangeTimer -= dt;
+    if (aiShipChangeTimer <= 0.0f)
+    {
+        // Pick a random AI slot and change its ship
+        int slot = rand() % MAX_PLAYERS;
+        if (!players[slot]->isConnected())
+        {
+            aiShipSelection[slot] = rand() % NUM_SHIP_TYPES;
+        }
+        aiShipChangeTimer = 0.3f + (rand() % 100) / 200.0f; // 0.3-0.8 seconds
+    }
+
     // Check if any button or click is pressed to start the game
     if (anyButtonPressed())
     {
@@ -292,7 +305,7 @@ void Game::startGame()
     float arenaW, arenaH;
     getWindowSize (arenaW, arenaH);
 
-    int numIslands = 1 + rand() % 5; // 1-5 islands
+    int numIslands = 2 + rand() % 10; // 2-11 islands
     for (int i = 0; i < numIslands; ++i)
     {
         bool validPosition = false;
@@ -552,6 +565,19 @@ void Game::updateShells (float dt)
     for (auto& shell : shells)
     {
         shell.update (dt, windDrift);
+
+        // Check if shell hits an island (only while in flight, not after landing)
+        if (shell.isAlive() && !shell.hasLanded())
+        {
+            for (const auto& island : islands)
+            {
+                if (island.containsPoint (shell.getPosition()))
+                {
+                    shell.kill();
+                    break;
+                }
+            }
+        }
     }
 
     // Remove dead shells
@@ -588,7 +614,12 @@ void Game::checkCollisions()
                 float arenaWidth, arenaHeight;
                 getWindowSize (arenaWidth, arenaHeight);
 
-                ship->takeDamage (shell.getDamage());
+                ship->takeDamage (shell.getDamage(), shell.getPosition());
+
+                // Track damage dealt by the shooter
+                int ownerIdx = shell.getOwnerIndex();
+                if (ownerIdx >= 0 && ownerIdx < MAX_SHIPS && ships[ownerIdx])
+                    ships[ownerIdx]->addDamageDealt (shell.getDamage());
 
                 // Spawn hit explosion
                 Explosion explosion;
@@ -983,8 +1014,15 @@ void Game::renderTitle()
             }
             else
             {
-                renderer->drawRect ({ slotPos.x - 30, slotPos.y - 40 }, 60, 80, config.colorGreyDark);
-                renderer->drawTextCentered ("AI", slotPos, 2.0f, config.colorGreyDark);
+                // Draw AI ship preview with random cycling ship type
+                renderer->drawShipPreview (aiShipSelection[i], slotPos, -pi / 4.0f, i);
+
+                // Draw AI label below
+                renderer->drawTextCentered ("AI", { slotPos.x, slotPos.y + 50.0f }, 2.0f, config.colorGreyDark);
+
+                // Draw ship type name
+                std::string shipName = config.shipTypes[aiShipSelection[i]].name;
+                renderer->drawTextCentered (shipName, { slotPos.x, slotPos.y + 70.0f }, 1.5f, config.colorGreyLight);
             }
         }
 
@@ -1010,8 +1048,15 @@ void Game::renderTitle()
             }
             else
             {
-                renderer->drawRect ({ slotPos.x - 30, slotPos.y - 40 }, 60, 80, config.colorGreyDark);
-                renderer->drawTextCentered ("AI", slotPos, 2.0f, config.colorGreyDark);
+                // Draw AI ship preview with random cycling ship type
+                renderer->drawShipPreview (aiShipSelection[i], slotPos, -pi / 4.0f, i);
+
+                // Draw AI label below
+                renderer->drawTextCentered ("AI", { slotPos.x, slotPos.y + 50.0f }, 2.0f, config.colorGreyDark);
+
+                // Draw ship type name
+                std::string shipName = config.shipTypes[aiShipSelection[i]].name;
+                renderer->drawTextCentered (shipName, { slotPos.x, slotPos.y + 70.0f }, 1.5f, config.colorGreyLight);
             }
         }
 
@@ -1045,8 +1090,15 @@ void Game::renderTitle()
             }
             else
             {
-                renderer->drawRect ({ slotPos.x - 30, slotPos.y - 40 }, 60, 80, config.colorGreyDark);
-                renderer->drawTextCentered ("AI", slotPos, 2.0f, config.colorGreyDark);
+                // Draw AI ship preview with random cycling ship type
+                renderer->drawShipPreview (aiShipSelection[i], slotPos, -pi / 4.0f, i);
+
+                // Draw AI label below
+                renderer->drawTextCentered ("AI", { slotPos.x, slotPos.y + 50.0f }, 2.0f, config.colorGreyDark);
+
+                // Draw ship type name
+                std::string shipName = config.shipTypes[aiShipSelection[i]].name;
+                renderer->drawTextCentered (shipName, { slotPos.x, slotPos.y + 70.0f }, 1.5f, config.colorGreyLight);
             }
         }
     }
@@ -1240,6 +1292,25 @@ void Game::renderGameOver()
                                 "  P4: " + std::to_string (playerWins[3]);
         renderer->drawTextCentered (statsText, { w / 2.0f, h / 2.0f + 40.0f }, 2.5f, statsColor);
     }
+
+    // Display damage dealt by each ship
+    int numShips = getNumShipsForMode();
+    float damageY = h / 2.0f + 80.0f;
+    std::string damageHeader = "DAMAGE DEALT";
+    renderer->drawTextCentered (damageHeader, { w / 2.0f, damageY }, 1.8f, statsColor);
+
+    damageY += 25.0f;
+    for (int i = 0; i < numShips; ++i)
+    {
+        if (ships[i])
+        {
+            int damage = (int) ships[i]->getDamageDealt();
+            std::string label = "P" + std::to_string (i + 1) + ": " + std::to_string (damage);
+            float xOffset = (i - (numShips - 1) / 2.0f) * 80.0f;
+            Color shipColor = ships[i]->getColor();
+            renderer->drawTextCentered (label, { w / 2.0f + xOffset, damageY }, 1.5f, shipColor);
+        }
+    }
 }
 
 Vec2 Game::getShipStartPosition (int index) const
@@ -1297,14 +1368,28 @@ Vec2 Game::getShipStartPosition (int index) const
             return { w - margin, y };
     }
 
-    // FFA mode: Place ships in a circle around the center
+    // FFA mode: Place ships in corners
+    float margin = 150.0f;
+
+    // Corner positions: top-left, top-right, bottom-right, bottom-left
+    Vec2 corners[4] = {
+        { margin, margin },           // top-left
+        { w - margin, margin },       // top-right
+        { w - margin, h - margin },   // bottom-right
+        { margin, h - margin }        // bottom-left
+    };
+
+    int numShips = getNumShipsForMode();
+    if (numShips <= 4)
+    {
+        return corners[index % 4];
+    }
+
+    // For more than 4 ships, fall back to circle
     Vec2 center = { w / 2.0f, h / 2.0f };
     float radius = std::min (w, h) * 0.35f;
-
     float angleOffset = -pi / 2.0f;
-    int numShips = getNumShipsForMode();
     float angle = angleOffset + (index * 2.0f * pi / numShips);
-
     return center + Vec2::fromAngle (angle) * radius;
 }
 
@@ -1337,11 +1422,25 @@ float Game::getShipStartAngle (int index) const
             return pi;    // Team 1 faces left
     }
 
-    // FFA mode: Point ships 90 degrees from center (tangent to circle)
-    float angleOffset = -pi / 2.0f;
+    // FFA mode: Point ships toward center from corners
     int numShips = getNumShipsForMode();
+    if (numShips <= 4)
+    {
+        // Angles pointing toward center from each corner
+        // top-left -> down-right, top-right -> down-left, etc.
+        float cornerAngles[4] = {
+            pi / 4.0f,          // top-left faces down-right
+            3.0f * pi / 4.0f,   // top-right faces down-left
+            -3.0f * pi / 4.0f,  // bottom-right faces up-left
+            -pi / 4.0f          // bottom-left faces up-right
+        };
+        return cornerAngles[index % 4];
+    }
+
+    // For more than 4 ships, point toward center from circle position
+    float angleOffset = -pi / 2.0f;
     float posAngle = angleOffset + (index * 2.0f * pi / numShips);
-    return posAngle + pi + (pi / 2.0f);
+    return posAngle + pi;
 }
 
 void Game::getWindowSize (float& width, float& height) const

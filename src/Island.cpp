@@ -16,7 +16,7 @@ void Island::generateShape (float baseRadius, unsigned int seed)
         return ((seed >> 16) & 0x7FFF) / 32767.0f;
     };
 
-    int numVertices = 16 + (int) (nextRandom() * 8); // 16-24 vertices
+    int numVertices = 32 + (int) (nextRandom() * 16); // 32-48 vertices
     float angleStep = 2.0f * (float) pi / numVertices;
 
     // Generate variation parameters for organic shape

@@ -288,10 +288,26 @@ Color Ship::getColor() const
     }
 }
 
-void Ship::takeDamage (float damage)
+void Ship::takeDamage (float damage, Vec2 hitWorldPos)
 {
     if (sinking)
         return; // Can't take more damage while sinking
+
+    // Store hit location in local ship coordinates
+    if (hitWorldPos.x != 0 || hitWorldPos.y != 0)
+    {
+        Vec2 localHit;
+        float cosA = std::cos (-angle);  // Negative angle to rotate world->local
+        float sinA = std::sin (-angle);
+        Vec2 diff = hitWorldPos - position;
+        localHit.x = diff.x * cosA - diff.y * sinA;
+        localHit.y = diff.x * sinA + diff.y * cosA;
+        hitLocations.push_back (localHit);
+
+        // Limit stored hits to prevent unbounded growth
+        if (hitLocations.size() > 20)
+            hitLocations.erase (hitLocations.begin());
+    }
 
     health -= damage;
     if (health <= 0)
@@ -389,20 +405,38 @@ bool Ship::fireShells()
         Vec2 crosshairWorld = position + crosshairOffset;
         float targetRange = std::max ((crosshairWorld - turretPos).length(), config.minShellRange);
 
-        // Apply random range variation
-        float rangeVariation = ((float) rand() / RAND_MAX - 0.5f) * 2.0f * config.shellRangeVariation;
-        targetRange *= (1.0f + rangeVariation);
+        float fireAngle = turret.getWorldAngle (angle);
 
-        // Apply random angle spread
-        float spreadAngle = ((float) rand() / RAND_MAX - 0.5f) * 2.0f * config.shellSpread;
-        float fireAngle = turret.getWorldAngle (angle) + spreadAngle;
+        // Direction vectors for barrel positioning
+        Vec2 fireDir = Vec2::fromAngle (fireAngle);
+        Vec2 perpDir = { -fireDir.y, fireDir.x }; // Perpendicular to fire direction
 
-        // Shell fires in direction turret is facing (with spread)
-        // Ship velocity affects shell velocity (firing forward = faster, backward = slower)
-        Vec2 shellVel = Vec2::fromAngle (fireAngle) * shellSpeed
-                      + velocity * config.shellShipVelocityFactor;
+        // Fire two shells from the twin barrels
+        float barrelLength = 20.0f;  // Distance from turret center to barrel tip
+        float barrelSpacing = 3.0f;  // Distance between the two barrels
 
-        pendingShells.push_back (Shell (turretPos, shellVel, playerIndex, targetRange, getShellDamage()));
+        for (int barrel = 0; barrel < 2; ++barrel)
+        {
+            // Offset perpendicular to firing direction (-1 for left barrel, +1 for right)
+            float sideOffset = (barrel == 0) ? -barrelSpacing : barrelSpacing;
+            Vec2 barrelTip = turretPos + fireDir * barrelLength + perpDir * sideOffset;
+
+            // Apply random range variation (per shell)
+            float rangeVariation = ((float) rand() / RAND_MAX - 0.5f) * 2.0f * config.shellRangeVariation;
+            float shellRange = targetRange * (1.0f + rangeVariation);
+
+            // Apply random angle spread (per shell)
+            float spreadAngle = ((float) rand() / RAND_MAX - 0.5f) * 2.0f * config.shellSpread;
+            float shellAngle = fireAngle + spreadAngle;
+
+            // Shell fires in direction turret is facing (with spread)
+            // Ship velocity affects shell velocity (firing forward = faster, backward = slower)
+            Vec2 shellVel = Vec2::fromAngle (shellAngle) * shellSpeed
+                          + velocity * config.shellShipVelocityFactor;
+
+            pendingShells.push_back (Shell (barrelTip, shellVel, playerIndex, shellRange, getShellDamage()));
+        }
+
         turret.fire();
         firedAny = true;
     }
@@ -544,12 +578,31 @@ void Ship::updateSmoke (float dt, Vec2 wind)
 
         if (damagePercent < 0.3f)
         {
-            // Light/no damage: smoke from engine (center)
-            spawnPos = position;
+            // Light/no damage: smoke from smoke stacks
+            const auto& shipTypeConfig = config.shipTypes[shipType];
+            int stackIdx = rand() % shipTypeConfig.numSmokeStacks;
+            float stackOffset = shipTypeConfig.smokeStackOffsets[stackIdx] * length;
+            spawnPos.x = position.x + stackOffset * cosA;
+            spawnPos.y = position.y + stackOffset * sinA;
+        }
+        else if (!hitLocations.empty())
+        {
+            // Heavy damage: smoke from random hit locations with some variation
+            int hitIdx = rand() % hitLocations.size();
+            Vec2 localHit = hitLocations[hitIdx];
+
+            // Add random offset but clamp to stay on ship
+            float offsetX = ((float) rand() / RAND_MAX - 0.5f) * 10.0f;
+            float offsetY = ((float) rand() / RAND_MAX - 0.5f) * 6.0f;
+            localHit.x = std::clamp (localHit.x + offsetX, -length * 0.4f, length * 0.4f);
+            localHit.y = std::clamp (localHit.y + offsetY, -width * 0.3f, width * 0.3f);
+
+            spawnPos.x = position.x + localHit.x * cosA - localHit.y * sinA;
+            spawnPos.y = position.y + localHit.x * sinA + localHit.y * cosA;
         }
         else
         {
-            // Heavy damage: smoke from random locations across ship
+            // Fallback: smoke from random locations across ship
             float randomX = ((float) rand() / RAND_MAX - 0.5f) * length * 0.8f;
             float randomY = ((float) rand() / RAND_MAX - 0.5f) * width * 0.6f;
             spawnPos.x = position.x + randomX * cosA - randomY * sinA;

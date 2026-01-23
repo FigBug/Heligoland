@@ -110,15 +110,19 @@ void AIController::updateMovement (float dt, const Ship& myShip, const std::vect
     float shipAngle = myShip.getAngle();
     float shipLength = myShip.getLength();
 
-    // Check if crashed into edge
-    float margin = shipLength;
-    bool nearEdge = myPos.x < margin || myPos.x > arenaWidth - margin ||
-                    myPos.y < margin || myPos.y > arenaHeight - margin;
-    bool stopped = speed < 0.5f && std::abs (myShip.getThrottle()) > 0.1f;
+    // Check if crashed into edge - only trigger if stuck and facing the wall
+    float margin = shipLength * 0.5f;
+    Vec2 shipForward = Vec2::fromAngle (shipAngle);
+    Vec2 toCenter = Vec2 (arenaWidth / 2.0f, arenaHeight / 2.0f) - myPos;
+    bool facingWall = shipForward.dot (toCenter.normalized()) < 0.0f;  // Facing away from center
 
-    if (nearEdge || stopped)
+    bool atEdge = myPos.x < margin || myPos.x > arenaWidth - margin ||
+                  myPos.y < margin || myPos.y > arenaHeight - margin;
+    bool stopped = speed < 0.5f && std::abs (myShip.getThrottle()) > 0.3f;
+
+    if (atEdge && stopped && facingWall)
     {
-        // Already crashed - reverse and turn away
+        // Actually crashed into edge and facing wall - reverse and turn away
         moveInput.y = 0.5f;
         moveInput.x = (rand() % 2 == 0) ? 1.0f : -1.0f;
         wanderTarget = { arenaWidth / 2.0f, arenaHeight / 2.0f };

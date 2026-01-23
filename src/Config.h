@@ -24,6 +24,10 @@ struct ShipType
     int numTurrets = 4;
     std::array<TurretConfig, 4> turrets;  // Up to 4 turrets
 
+    // Smoke stack positions (local X offset as fraction of ship length, 0 = center, positive = toward bow)
+    int numSmokeStacks = 1;
+    std::array<float, 2> smokeStackOffsets = { 0.0f, 0.0f };
+
     // Ship-specific stats (multipliers relative to base config values)
     float healthMultiplier = 1.0f;
     float speedMultiplier = 1.0f;
@@ -255,16 +259,19 @@ public:
     // -------------------------------------------------------------------------
     // Islands
     // -------------------------------------------------------------------------
-    float islandMinRadius             = 40.0f;
-    float islandMaxRadius             = 100.0f;
+    float islandMinRadius             = 30.0f;
+    float islandMaxRadius             = 70.0f;
     float islandEdgeMargin            = 50.0f;
     float islandShipClearance         = 150.0f;
     float islandIslandClearance       = 80.0f;
 
     // -------------------------------------------------------------------------
-    // Colors - Islands
+    // Colors - Islands (layers from outside to inside)
     // -------------------------------------------------------------------------
-    Color colorIslandSand             = { 210, 180, 140, 255 };
+    Color colorIslandWetSand          = { 180, 155, 120, 255 };  // Outer beach
+    Color colorIslandSand             = { 210, 185, 145, 255 };  // Dry sand
+    Color colorIslandLightGrass       = { 160, 180, 100, 255 };  // Light vegetation
+    Color colorIslandGrass            = { 100, 140, 70, 255 };   // Inner grass
     Color colorIslandOutline          = { 140, 110, 70, 255 };
 
     // -------------------------------------------------------------------------

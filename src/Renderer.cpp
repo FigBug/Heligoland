@@ -809,7 +809,7 @@ void Renderer::createNoiseTexture()
 void Renderer::loadShipTextures()
 {
     // Scale factor applied to all ship textures on load
-    const float shipTextureScale = 0.25f;
+    const float shipTextureScale = 0.5f;
 
     // New ship textures: ship1.png (1 turret) through ship4.png (4 turrets)
     const char* hullPaths[NUM_SHIP_TYPES] = {
@@ -1070,46 +1070,75 @@ void Renderer::drawIsland (const Island& island)
     if (vertices.size() < 3)
         return;
 
-    // Calculate bounding box
-    float minX = vertices[0].x, maxX = vertices[0].x;
-    float minY = vertices[0].y, maxY = vertices[0].y;
-    for (const auto& v : vertices)
-    {
-        minX = std::min (minX, v.x);
-        maxX = std::max (maxX, v.x);
-        minY = std::min (minY, v.y);
-        maxY = std::max (maxY, v.y);
-    }
+    Vec2 center = island.getCenter();
 
-    // Fill using horizontal scanlines
-    for (int y = (int) minY; y <= (int) maxY; ++y)
+    // Define layers from outside to inside (scale factor, color)
+    struct Layer
     {
-        std::vector<float> intersections;
-        int n = (int) vertices.size();
+        float scale;
+        Color color;
+    };
+    Layer layers[] = {
+        { 1.00f, config.colorIslandWetSand },
+        { 0.85f, config.colorIslandSand },
+        { 0.65f, config.colorIslandLightGrass },
+        { 0.45f, config.colorIslandGrass },
+    };
 
-        for (int i = 0; i < n; ++i)
+    // Draw each layer from largest to smallest
+    for (const auto& layer : layers)
+    {
+        // Scale vertices toward center
+        std::vector<Vec2> scaledVerts;
+        for (const auto& v : vertices)
         {
-            Vec2 v1 = vertices[i];
-            Vec2 v2 = vertices[(i + 1) % n];
+            Vec2 scaled;
+            scaled.x = center.x + (v.x - center.x) * layer.scale;
+            scaled.y = center.y + (v.y - center.y) * layer.scale;
+            scaledVerts.push_back (scaled);
+        }
 
-            if ((v1.y <= y && v2.y > y) || (v2.y <= y && v1.y > y))
+        // Calculate bounding box for this layer
+        float minX = scaledVerts[0].x, maxX = scaledVerts[0].x;
+        float minY = scaledVerts[0].y, maxY = scaledVerts[0].y;
+        for (const auto& v : scaledVerts)
+        {
+            minX = std::min (minX, v.x);
+            maxX = std::max (maxX, v.x);
+            minY = std::min (minY, v.y);
+            maxY = std::max (maxY, v.y);
+        }
+
+        // Fill using horizontal scanlines
+        for (int y = (int) minY; y <= (int) maxY; ++y)
+        {
+            std::vector<float> intersections;
+            int n = (int) scaledVerts.size();
+
+            for (int i = 0; i < n; ++i)
             {
-                float xIntersect = v1.x + (y - v1.y) / (v2.y - v1.y) * (v2.x - v1.x);
-                intersections.push_back (xIntersect);
+                Vec2 v1 = scaledVerts[i];
+                Vec2 v2 = scaledVerts[(i + 1) % n];
+
+                if ((v1.y <= y && v2.y > y) || (v2.y <= y && v1.y > y))
+                {
+                    float xIntersect = v1.x + (y - v1.y) / (v2.y - v1.y) * (v2.x - v1.x);
+                    intersections.push_back (xIntersect);
+                }
+            }
+
+            std::sort (intersections.begin(), intersections.end());
+
+            for (size_t i = 0; i + 1 < intersections.size(); i += 2)
+            {
+                int x1 = (int) intersections[i];
+                int x2 = (int) intersections[i + 1];
+                DrawLine (x1, y, x2, y, layer.color);
             }
         }
-
-        std::sort (intersections.begin(), intersections.end());
-
-        for (size_t i = 0; i + 1 < intersections.size(); i += 2)
-        {
-            int x1 = (int) intersections[i];
-            int x2 = (int) intersections[i + 1];
-            DrawLine (x1, y, x2, y, config.colorIslandSand);
-        }
     }
 
-    // Draw outline
+    // Draw outline on the outer edge
     int n = (int) vertices.size();
     for (int i = 0; i < n; ++i)
     {
