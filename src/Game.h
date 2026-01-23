@@ -3,6 +3,7 @@
 #include "AIController.h"
 #include "Audio.h"
 #include "Config.h"
+#include "Island.h"
 #include "Player.h"
 #include "Renderer.h"
 #include "Shell.h"
@@ -72,6 +73,7 @@ private:
     std::array<std::unique_ptr<AIController>, MAX_SHIPS> aiControllers;
     std::vector<Shell> shells;
     std::vector<Explosion> explosions;
+    std::vector<Island> islands;
 
     // Ship selection for each player (0-3 = ship types with 1-4 turrets)
     std::array<int, MAX_PLAYERS> playerShipSelection = { 3, 3, 3, 3 };  // Default to battleship

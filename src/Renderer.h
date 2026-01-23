@@ -6,6 +6,7 @@
 
 class Ship;
 class Shell;
+class Island;
 struct Explosion;
 
 class Renderer
@@ -26,6 +27,7 @@ public:
     void drawCrosshair (const Ship& ship);
     void drawShipHUD (const Ship& ship, int slot, int totalSlots, float screenWidth, float hudWidth, float alpha = 1.0f);
     void drawWindIndicator (Vec2 wind, float screenWidth, float screenHeight);
+    void drawIsland (const Island& island);
 
     void drawOval (Vec2 center, float width, float height, float angle, Color color);
     void drawCircle (Vec2 center, float radius, Color color);

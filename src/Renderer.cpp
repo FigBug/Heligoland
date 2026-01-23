@@ -1,6 +1,7 @@
 #include "Renderer.h"
 #include "Config.h"
 #include "Game.h"
+#include "Island.h"
 #include "Shell.h"
 #include "Ship.h"
 #include <algorithm>
@@ -1061,4 +1062,59 @@ bool Renderer::checkShipCollision (const Ship& shipA, const Ship& shipB, Vec2& c
     }
 
     return false;
+}
+
+void Renderer::drawIsland (const Island& island)
+{
+    const auto& vertices = island.getVertices();
+    if (vertices.size() < 3)
+        return;
+
+    // Calculate bounding box
+    float minX = vertices[0].x, maxX = vertices[0].x;
+    float minY = vertices[0].y, maxY = vertices[0].y;
+    for (const auto& v : vertices)
+    {
+        minX = std::min (minX, v.x);
+        maxX = std::max (maxX, v.x);
+        minY = std::min (minY, v.y);
+        maxY = std::max (maxY, v.y);
+    }
+
+    // Fill using horizontal scanlines
+    for (int y = (int) minY; y <= (int) maxY; ++y)
+    {
+        std::vector<float> intersections;
+        int n = (int) vertices.size();
+
+        for (int i = 0; i < n; ++i)
+        {
+            Vec2 v1 = vertices[i];
+            Vec2 v2 = vertices[(i + 1) % n];
+
+            if ((v1.y <= y && v2.y > y) || (v2.y <= y && v1.y > y))
+            {
+                float xIntersect = v1.x + (y - v1.y) / (v2.y - v1.y) * (v2.x - v1.x);
+                intersections.push_back (xIntersect);
+            }
+        }
+
+        std::sort (intersections.begin(), intersections.end());
+
+        for (size_t i = 0; i + 1 < intersections.size(); i += 2)
+        {
+            int x1 = (int) intersections[i];
+            int x2 = (int) intersections[i + 1];
+            DrawLine (x1, y, x2, y, config.colorIslandSand);
+        }
+    }
+
+    // Draw outline
+    int n = (int) vertices.size();
+    for (int i = 0; i < n; ++i)
+    {
+        Vec2 v1 = vertices[i];
+        Vec2 v2 = vertices[(i + 1) % n];
+        DrawLine ((int) v1.x, (int) v1.y, (int) v2.x, (int) v2.y, config.colorIslandOutline);
+    }
 }

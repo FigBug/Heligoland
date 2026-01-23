@@ -28,6 +28,7 @@ set(SOURCES
     src/Ship.cpp
     src/Turret.cpp
     src/Shell.cpp
+    src/Island.cpp
     src/Player.cpp
     src/AIController.cpp
     src/Renderer.cpp
@@ -47,6 +48,7 @@ set(HEADERS
     src/Ship.h
     src/Turret.h
     src/Shell.h
+    src/Island.h
     src/Player.h
     src/AIController.h
     src/Renderer.h

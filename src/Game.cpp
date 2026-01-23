@@ -287,6 +287,63 @@ void Game::startGame()
     gameOverTimer = 0.0f;
     gameStartDelay = config.gameStartDelay;
 
+    // Spawn islands
+    islands.clear();
+    float arenaW, arenaH;
+    getWindowSize (arenaW, arenaH);
+
+    int numIslands = 1 + rand() % 5; // 1-5 islands
+    for (int i = 0; i < numIslands; ++i)
+    {
+        bool validPosition = false;
+        Vec2 islandCenter;
+        float islandRadius = config.islandMinRadius + ((float) rand() / RAND_MAX) * (config.islandMaxRadius - config.islandMinRadius);
+
+        int attempts = 0;
+        while (!validPosition && attempts < 50)
+        {
+            attempts++;
+
+            // Random position with margin from edges
+            float margin = islandRadius + config.islandEdgeMargin;
+            islandCenter.x = margin + ((float) rand() / RAND_MAX) * (arenaW - 2 * margin);
+            islandCenter.y = margin + ((float) rand() / RAND_MAX) * (arenaH - 2 * margin);
+
+            validPosition = true;
+
+            // Check against ship starting positions
+            for (int s = 0; s < numShips; ++s)
+            {
+                Vec2 shipStart = getShipStartPosition (s);
+                float minDist = islandRadius + config.islandShipClearance;
+
+                if ((shipStart - islandCenter).length() < minDist)
+                {
+                    validPosition = false;
+                    break;
+                }
+            }
+
+            // Check against other islands
+            for (const auto& other : islands)
+            {
+                float minDist = islandRadius + other.getBoundingRadius() + config.islandIslandClearance;
+
+                if ((other.getCenter() - islandCenter).length() < minDist)
+                {
+                    validPosition = false;
+                    break;
+                }
+            }
+        }
+
+        if (validPosition)
+        {
+            unsigned int seed = (unsigned int) (time * 1000 + i * 12345);
+            islands.emplace_back (islandCenter, islandRadius, seed);
+        }
+    }
+
     // Initialize wind (minimum strength)
     float windAngle = ((float) rand() / RAND_MAX) * 2.0f * pi;
     float windStrength = config.windMinStrength + ((float) rand() / RAND_MAX) * (1.0f - config.windMinStrength);
@@ -365,7 +422,7 @@ void Game::updatePlaying (float dt)
                 if (areEnemies (shipIdx, j) && ships[j] && ships[j]->isAlive())
                     enemies.push_back (ships[j].get());
 
-            aiControllers[shipIdx]->update (dt, *ships[shipIdx], enemies, shells, arenaWidth, arenaHeight);
+            aiControllers[shipIdx]->update (dt, *ships[shipIdx], enemies, shells, islands, arenaWidth, arenaHeight);
             moveInput = aiControllers[shipIdx]->getMoveInput();
             aimInput = aiControllers[shipIdx]->getAimInput();
             fireInput = aiControllers[shipIdx]->getFireInput();
@@ -695,6 +752,49 @@ void Game::checkCollisions()
             }
         }
     }
+
+    // Ship-to-island collisions
+    for (int i = 0; i < numShips; ++i)
+    {
+        if (!ships[i] || !ships[i]->isVisible())
+            continue;
+
+        auto corners = ships[i]->getCorners();
+
+        for (const auto& island : islands)
+        {
+            // Quick bounding circle check first
+            Vec2 shipPos = ships[i]->getPosition();
+            float maxShipRadius = ships[i]->getLength() / 2.0f;
+
+            if ((shipPos - island.getCenter()).length() > island.getBoundingRadius() + maxShipRadius)
+                continue;
+
+            // Check each corner of the ship
+            for (const auto& corner : corners)
+            {
+                Vec2 pushDir;
+                float pushDist;
+
+                if (island.getCollisionResponse (corner, pushDir, pushDist))
+                {
+                    // Apply collision response (island is stationary)
+                    Vec2 shipVel = ships[i]->getVelocity();
+                    ships[i]->applyCollision (pushDir, pushDist, shipVel, Vec2 (0, 0));
+
+                    // Apply some damage based on impact speed
+                    float impactSpeed = std::abs (shipVel.dot (pushDir));
+                    if (impactSpeed > 2.0f)
+                    {
+                        float damage = impactSpeed * config.collisionDamageScale * 0.5f;
+                        ships[i]->takeDamage (damage);
+                    }
+
+                    break; // Only handle one corner collision per frame
+                }
+            }
+        }
+    }
 }
 
 void Game::checkGameOver()
@@ -976,7 +1076,11 @@ void Game::renderPlaying()
     float w, h;
     getWindowSize (w, h);
 
-    // Draw bubble trails first (behind everything)
+    // Draw islands (behind everything)
+    for (const auto& island : islands)
+        renderer->drawIsland (island);
+
+    // Draw bubble trails (behind ships)
     for (const auto& ship : ships)
         if (ship && ship->isVisible())
             renderer->drawBubbleTrail (*ship);

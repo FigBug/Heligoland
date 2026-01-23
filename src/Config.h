@@ -253,6 +253,21 @@ public:
     Color colorWindArrow              = { 200, 200, 255, 255 };
 
     // -------------------------------------------------------------------------
+    // Islands
+    // -------------------------------------------------------------------------
+    float islandMinRadius             = 40.0f;
+    float islandMaxRadius             = 100.0f;
+    float islandEdgeMargin            = 50.0f;
+    float islandShipClearance         = 150.0f;
+    float islandIslandClearance       = 80.0f;
+
+    // -------------------------------------------------------------------------
+    // Colors - Islands
+    // -------------------------------------------------------------------------
+    Color colorIslandSand             = { 210, 180, 140, 255 };
+    Color colorIslandOutline          = { 140, 110, 70, 255 };
+
+    // -------------------------------------------------------------------------
     // Ship Types (4 types with 1-4 turrets)
     // -------------------------------------------------------------------------
     std::array<ShipType, NUM_SHIP_TYPES> shipTypes;
