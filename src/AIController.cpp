@@ -562,7 +562,7 @@ void AIController::updateAim (const Ship& myShip, const Ship* targetShip)
 
             // Fire if crosshair is close to predicted position and in range
             fireInput = crosshairDist < config.aiCrosshairTolerance * personalityFactor &&
-                        distance < config.aiFireDistance * personalityFactor &&
+                        distance < myShip.getMaxRange() * personalityFactor &&
                         myShip.isReadyToFire();
         }
         else

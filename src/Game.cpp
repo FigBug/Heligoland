@@ -972,7 +972,7 @@ void Game::renderTitle()
     // Draw player slots with ship previews
     int numSlots = (gameMode == GameMode::Battle) ? MAX_PLAYERS : getNumShipsForMode();
     float slotY = h * 0.62f;
-    float slotSpacing = 140.0f;
+    float slotSpacing = 180.0f;
 
     // Helper to get player color
     auto getPlayerColor = [this] (int playerIndex) -> Color
@@ -989,72 +989,39 @@ void Game::renderTitle()
 
     if (gameMode == GameMode::Teams || gameMode == GameMode::Battle)
     {
-        // Battle mode: show 2 slots per team with team labels
-        float teamSpacing = 200.0f;
-        float startX = w / 2.0f - teamSpacing / 2.0f - slotSpacing / 2.0f;
+        // Team modes: use FFA layout but with a gap in the center
+        // Layout: [P1] [P2] --- gap --- [P3] [P4]
+        float centerGap = 250.0f;
+        float halfTeamWidth = slotSpacing / 2.0f;  // Half the width of one team (2 slots)
 
-        // Team 1 slots (players 0, 1)
-        renderer->drawTextCentered ("TEAM 1", { startX + slotSpacing / 2.0f, slotY - 70.0f }, 2.0f, config.colorTeam1);
-        for (int i = 0; i < 2; ++i)
+        // Team 1 center is left of screen center, Team 2 center is right
+        float team1Center = w / 2.0f - centerGap / 2.0f - halfTeamWidth;
+        float team2Center = w / 2.0f + centerGap / 2.0f + halfTeamWidth;
+
+        // Draw team labels
+        renderer->drawTextCentered ("TEAM 1", { team1Center, slotY - 70.0f }, 2.0f, config.colorTeam1);
+        renderer->drawTextCentered ("TEAM 2", { team2Center, slotY - 70.0f }, 2.0f, config.colorTeam2);
+
+        for (int i = 0; i < 4; ++i)
         {
-            Vec2 slotPos = { startX + i * slotSpacing, slotY };
+            Vec2 slotPos;
+            if (i < 2)
+                slotPos = { team1Center + (i - 0.5f) * slotSpacing, slotY };
+            else
+                slotPos = { team2Center + (i - 2.5f) * slotSpacing, slotY };
             Color slotColor = getPlayerColor (i);
 
             if (players[i]->isConnected())
             {
-                // Draw ship preview (45 degrees) with player color on turrets
                 renderer->drawShipPreview (playerShipSelection[i], slotPos, -pi / 4.0f, i);
-
-                // Draw player label below
                 renderer->drawTextCentered ("P" + std::to_string (i + 1), { slotPos.x, slotPos.y + 50.0f }, 2.0f, slotColor);
-
-                // Draw ship type name
                 std::string shipName = config.shipTypes[playerShipSelection[i]].name;
                 renderer->drawTextCentered (shipName, { slotPos.x, slotPos.y + 70.0f }, 1.5f, config.colorGreyLight);
             }
             else
             {
-                // Draw AI ship preview with random cycling ship type
                 renderer->drawShipPreview (aiShipSelection[i], slotPos, -pi / 4.0f, i);
-
-                // Draw AI label below
                 renderer->drawTextCentered ("AI", { slotPos.x, slotPos.y + 50.0f }, 2.0f, config.colorGreyDark);
-
-                // Draw ship type name
-                std::string shipName = config.shipTypes[aiShipSelection[i]].name;
-                renderer->drawTextCentered (shipName, { slotPos.x, slotPos.y + 70.0f }, 1.5f, config.colorGreyLight);
-            }
-        }
-
-        // Team 2 slots (players 2, 3)
-        float team2StartX = w / 2.0f + teamSpacing / 2.0f - slotSpacing / 2.0f;
-        renderer->drawTextCentered ("TEAM 2", { team2StartX + slotSpacing / 2.0f, slotY - 70.0f }, 2.0f, config.colorTeam2);
-        for (int i = 2; i < 4; ++i)
-        {
-            Vec2 slotPos = { team2StartX + (i - 2) * slotSpacing, slotY };
-            Color slotColor = getPlayerColor (i);
-
-            if (players[i]->isConnected())
-            {
-                // Draw ship preview (45 degrees) with player color on turrets
-                renderer->drawShipPreview (playerShipSelection[i], slotPos, -pi / 4.0f, i);
-
-                // Draw player label below
-                renderer->drawTextCentered ("P" + std::to_string (i + 1), { slotPos.x, slotPos.y + 50.0f }, 2.0f, slotColor);
-
-                // Draw ship type name
-                std::string shipName = config.shipTypes[playerShipSelection[i]].name;
-                renderer->drawTextCentered (shipName, { slotPos.x, slotPos.y + 70.0f }, 1.5f, config.colorGreyLight);
-            }
-            else
-            {
-                // Draw AI ship preview with random cycling ship type
-                renderer->drawShipPreview (aiShipSelection[i], slotPos, -pi / 4.0f, i);
-
-                // Draw AI label below
-                renderer->drawTextCentered ("AI", { slotPos.x, slotPos.y + 50.0f }, 2.0f, config.colorGreyDark);
-
-                // Draw ship type name
                 std::string shipName = config.shipTypes[aiShipSelection[i]].name;
                 renderer->drawTextCentered (shipName, { slotPos.x, slotPos.y + 70.0f }, 1.5f, config.colorGreyLight);
             }
@@ -1063,8 +1030,8 @@ void Game::renderTitle()
         if (gameMode == GameMode::Battle)
         {
             // Show "+4 AI" indicators for each team
-            renderer->drawTextCentered ("+4 AI", { startX + slotSpacing / 2.0f, slotY + 90.0f }, 1.5f, config.colorGreySubtle);
-            renderer->drawTextCentered ("+4 AI", { team2StartX + slotSpacing / 2.0f, slotY + 90.0f }, 1.5f, config.colorGreySubtle);
+            renderer->drawTextCentered ("+4 AI", { team1Center, slotY + 90.0f }, 1.5f, config.colorGreySubtle);
+            renderer->drawTextCentered ("+4 AI", { team2Center, slotY + 90.0f }, 1.5f, config.colorGreySubtle);
         }
     }
     else

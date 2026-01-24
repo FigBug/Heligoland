@@ -76,7 +76,7 @@ private:
     std::vector<Island> islands;
 
     // Ship selection for each player (0-3 = ship types with 1-4 turrets)
-    std::array<int, MAX_PLAYERS> playerShipSelection = { 0, 2, 2, 2 };  // Default to cruiser
+    std::array<int, MAX_PLAYERS> playerShipSelection = { 3, 2, 2, 2 };  // Default to cruiser
 
     // AI ship selection (randomly cycles on title screen)
     std::array<int, MAX_PLAYERS> aiShipSelection = {};

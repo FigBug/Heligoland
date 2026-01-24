@@ -73,7 +73,7 @@ void Config::initDefaultShipTypes()
     shipTypes[0].numTurrets = 1;
     shipTypes[0].turrets[0] = { 0.24f, true };  // Single front turret
     shipTypes[0].numSmokeStacks = 1;
-    shipTypes[0].smokeStackOffsets = { -0.10f, 0.0f };  // Single stack behind center
+    shipTypes[0].smokeStackOffsets = { -0.12f, 0.0f };  // Single stack behind center
     shipTypes[0].healthMultiplier = 0.6f;
     shipTypes[0].speedMultiplier = 1.4f;
     shipTypes[0].turnMultiplier = 1.25f;
@@ -88,7 +88,7 @@ void Config::initDefaultShipTypes()
     shipTypes[1].turrets[0] = { 0.19f, true };   // Front turret
     shipTypes[1].turrets[1] = { -0.41f, false }; // Rear turret
     shipTypes[1].numSmokeStacks = 1;
-    shipTypes[1].smokeStackOffsets = { -0.10f, 0.0f };  // Single stack behind center
+    shipTypes[1].smokeStackOffsets = { -0.13f, 0.0f };  // Single stack behind center
     shipTypes[1].healthMultiplier = 0.8f;
     shipTypes[1].speedMultiplier = 1.15f;
     shipTypes[1].turnMultiplier = 1.15f;
@@ -104,7 +104,7 @@ void Config::initDefaultShipTypes()
     shipTypes[2].turrets[1] = { 0.17f, true };   // Mid (front-facing)
     shipTypes[2].turrets[2] = { -0.350f, false }; // Rear
     shipTypes[2].numSmokeStacks = 2;
-    shipTypes[2].smokeStackOffsets = { 0.05f, -0.05f };  // Two stacks near center
+    shipTypes[2].smokeStackOffsets = { -0.066f, -0.109f };  // Two stacks near center
     shipTypes[2].healthMultiplier = 1.0f;
     shipTypes[2].speedMultiplier = 1.0f;
     shipTypes[2].turnMultiplier = 1.0f;
@@ -121,7 +121,7 @@ void Config::initDefaultShipTypes()
     shipTypes[3].turrets[2] = { -0.28f, false }; // Rear-mid
     shipTypes[3].turrets[3] = { -0.41f, false }; // Rear
     shipTypes[3].numSmokeStacks = 2;
-    shipTypes[3].smokeStackOffsets = { 0.08f, -0.04f };  // Two stacks near center
+    shipTypes[3].smokeStackOffsets = { -0.027f, -0.0645f };  // Two stacks near center
     shipTypes[3].healthMultiplier = 1.25f;
     shipTypes[3].speedMultiplier = 0.8f;
     shipTypes[3].turnMultiplier = 0.8f;
