@@ -87,11 +87,17 @@ private:
     Vec2 targetWind; // Wind is slowly moving toward this target
     float windChangeTimer = 0.0f;
 
+    // Current system (affects ship movement)
+    Vec2 current; // Current direction and strength (length = strength 0-1)
+    Vec2 targetCurrent; // Current is slowly moving toward this target
+    float currentChangeTimer = 0.0f;
+
     // Win tracking
     std::array<int, MAX_PLAYERS> playerWins = {}; // Wins per player in FFA mode
     std::array<int, 2> teamWins = {};             // Wins per team in Teams/Battle mode
 
     void updateWind (float dt);
+    void updateCurrent (float dt);
 
     void handleEvents();
     void update (float dt);

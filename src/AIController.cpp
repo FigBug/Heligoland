@@ -156,10 +156,8 @@ void AIController::updateMovement (float dt, const Ship& myShip, const std::vect
 
             if (std::abs (angleDiff) < pi * 0.5f)
                 moveInput.y = -desiredSpeed;
-            else if (std::abs (angleDiff) > pi * 0.75f)
-                moveInput.y = 0.3f;  // Reverse while turning
             else
-                moveInput.y = 0.0f;
+                moveInput.y = 0.3f;  // Reverse while turning
         }
         return;
     }
@@ -349,28 +347,23 @@ void AIController::updateMovement (float dt, const Ship& myShip, const std::vect
         // Turn toward target
         moveInput.x = std::clamp (angleDiff * 2.0f, -1.0f, 1.0f);
 
-        // Always apply some throttle to avoid getting stuck
+        // Always apply at least 20% throttle to avoid getting stuck
         if (std::abs (angleDiff) < pi * 0.5f)
         {
-            // Facing target - full speed forward
-            moveInput.y = -desiredSpeed;
-        }
-        else if (std::abs (angleDiff) > pi * 0.75f)
-        {
-            // Facing away - reverse while turning
-            moveInput.y = 0.3f;
+            // Facing target - forward (at least 20%)
+            moveInput.y = -std::max (desiredSpeed, 0.2f);
         }
         else
         {
-            // Sideways - slow forward while turning
-            moveInput.y = -0.2f;
+            // Facing away or sideways - reverse while turning (at least 20%)
+            moveInput.y = std::max (0.3f, 0.2f);
         }
     }
     else
     {
-        // No clear direction - just move forward slowly to avoid getting stuck
+        // No clear direction - move forward to avoid getting stuck
         moveInput.x = 0.0f;
-        moveInput.y = -0.3f;
+        moveInput.y = -0.2f;
     }
 }
 

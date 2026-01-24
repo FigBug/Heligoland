@@ -29,7 +29,7 @@ class Ship
 public:
     Ship (int playerIndex, Vec2 startPos, float startAngle, float shipLength, float shipWidth, int team = -1, int shipType = 3);  // team: -1=FFA, 0=team1, 1=team2; shipType: 0-3
 
-    void update (float dt, Vec2 moveInput, Vec2 aimInput, bool fireInput, float arenaWidth, float arenaHeight, Vec2 wind);
+    void update (float dt, Vec2 moveInput, Vec2 aimInput, bool fireInput, float arenaWidth, float arenaHeight, Vec2 wind, Vec2 current);
 
     Vec2 getPosition() const                        { return position; }
     float getAngle() const                          { return angle; }
@@ -61,6 +61,7 @@ public:
 
     // Combat stats
     float getMaxRange() const       { return config.maxShellRange * config.shipTypes[shipType].rangeMultiplier; }
+    float getMinRange() const       { return config.minShellRange * config.shipTypes[shipType].rangeMultiplier; }
     float getShellDamage() const    { return config.shellDamage * config.shipTypes[shipType].damageMultiplier; }
     float getDamageDealt() const    { return damageDealt; }
     void addDamageDealt (float damage) { damageDealt += damage; }
@@ -77,7 +78,7 @@ public:
     float getCrosshairDistance() const; // Distance from ship to crosshair
     float getReloadProgress() const; // Progress of the slowest turret (0.0 to 1.0)
     bool isReadyToFire() const; // True if reloaded AND turrets on target AND in range
-    bool isCrosshairInRange() const { return crosshairOffset.length() >= config.minShellRange; }
+    bool isCrosshairInRange() const { return crosshairOffset.length() >= getMinRange(); }
 
 private:
     int playerIndex;

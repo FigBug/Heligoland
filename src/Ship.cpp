@@ -31,7 +31,7 @@ Ship::Ship (int playerIndex_, Vec2 startPos, float startAngle, float shipLength,
     crosshairOffset = Vec2::fromAngle (angle) * config.crosshairStartDistance;
 }
 
-void Ship::update (float dt, Vec2 moveInput, Vec2 aimInput, bool fireInput, float arenaWidth, float arenaHeight, Vec2 wind)
+void Ship::update (float dt, Vec2 moveInput, Vec2 aimInput, bool fireInput, float arenaWidth, float arenaHeight, Vec2 wind, Vec2 current)
 {
     // Handle sinking
     if (isSinking())
@@ -163,8 +163,9 @@ void Ship::update (float dt, Vec2 moveInput, Vec2 aimInput, bool fireInput, floa
     while (angle < -pi)
         angle += 2.0f * pi;
 
-    // Update position
-    position += velocity * dt;
+    // Update position (include current drift)
+    Vec2 currentDrift = current * config.currentShipEffect;
+    position += (velocity + currentDrift) * dt;
 
     // Clamp to arena
     clampToArena (arenaWidth, arenaHeight);
@@ -403,7 +404,7 @@ bool Ship::fireShells()
 
         // Calculate range for this turret: distance from turret to crosshair
         Vec2 crosshairWorld = position + crosshairOffset;
-        float targetRange = std::max ((crosshairWorld - turretPos).length(), config.minShellRange);
+        float targetRange = std::max ((crosshairWorld - turretPos).length(), getMinRange());
 
         float fireAngle = turret.getWorldAngle (angle);
 

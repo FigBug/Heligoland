@@ -306,6 +306,7 @@ bool Config::load()
         loadValue (s, "engineBaseVolume", audioEngineBaseVolume);
         loadValue (s, "engineThrottleBoost", audioEngineThrottleBoost);
         loadValue (s, "minImpactForSound", audioMinImpactForSound);
+        loadValue (s, "masterVolume", audioMasterVolume);
     }
 
     // Game Flow
@@ -526,7 +527,8 @@ bool Config::save() const
         { "gainVariation", audioGainVariation },
         { "engineBaseVolume", audioEngineBaseVolume },
         { "engineThrottleBoost", audioEngineThrottleBoost },
-        { "minImpactForSound", audioMinImpactForSound }
+        { "minImpactForSound", audioMinImpactForSound },
+        { "masterVolume", audioMasterVolume }
     };
 
     // Game Flow

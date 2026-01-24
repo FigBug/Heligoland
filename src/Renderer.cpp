@@ -223,8 +223,9 @@ void Renderer::drawShip (const Ship& ship)
                 float turretAngleDeg = turretAngle * (180.0f / pi) + 90.0f;
 
                 // Tint turrets with player color so users can identify their ship (subtle blend with white)
+                // Remove tint when ship is sinking
                 Color shipColor = ship.getColor();
-                float blend = 0.5f; // 0 = white, 1 = full color
+                float blend = ship.isSinking() ? 0.0f : 0.5f;
                 Color turretTint = {
                     (unsigned char) (255 * (1 - blend) + shipColor.r * blend),
                     (unsigned char) (255 * (1 - blend) + shipColor.g * blend),
@@ -501,6 +502,40 @@ void Renderer::drawWindIndicator (Vec2 wind, float screenWidth, float screenHeig
 
     // Label
     drawText ("WIND", { center.x - 6, center.y + indicatorSize + 3 }, 0.75f, config.colorGreyLight);
+}
+
+void Renderer::drawCurrentIndicator (Vec2 current, float screenWidth, float screenHeight)
+{
+    // Draw current indicator in bottom-right corner
+    float indicatorSize = 20.0f;
+    Vec2 center = { screenWidth - 35, screenHeight - 35 };
+
+    // Background circle
+    drawFilledCircle (center, indicatorSize, config.colorCurrentBackground);
+    drawCircle (center, indicatorSize, config.colorCurrentBorder);
+
+    // Current arrow
+    float currentStrength = current.length();
+    if (currentStrength > 0.01f)
+    {
+        Vec2 currentDir = current.normalized();
+        float arrowLength = indicatorSize * 0.8f * (currentStrength / config.currentMaxStrength);
+
+        Vec2 arrowEnd = center + currentDir * arrowLength;
+
+        // Arrow shaft
+        drawLine (center, arrowEnd, config.colorCurrentArrow);
+
+        // Arrow head
+        float headSize = 4.0f;
+        Vec2 head1 = arrowEnd - currentDir * headSize + Vec2::fromAngle (currentDir.toAngle() + pi * 0.5f) * headSize * 0.5f;
+        Vec2 head2 = arrowEnd - currentDir * headSize - Vec2::fromAngle (currentDir.toAngle() + pi * 0.5f) * headSize * 0.5f;
+        drawLine (arrowEnd, head1, config.colorCurrentArrow);
+        drawLine (arrowEnd, head2, config.colorCurrentArrow);
+    }
+
+    // Label
+    drawText ("CURRENT", { center.x - 14, center.y + indicatorSize + 3 }, 0.75f, config.colorGreyLight);
 }
 
 void Renderer::drawOval (Vec2 center, float width, float height, float angle, Color color)

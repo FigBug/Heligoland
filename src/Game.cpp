@@ -24,6 +24,11 @@ bool Game::init()
         // Audio is optional - continue without it
         audio.reset();
     }
+    else
+    {
+        // Load saved volume level
+        audio->setMasterVolume (config.audioMasterVolume);
+    }
 
     // Create players (but not ships yet - those are created when game starts)
     for (int i = 0; i < MAX_PLAYERS; ++i)
@@ -212,10 +217,18 @@ void Game::updateTitle (float dt)
         }
 
         // Adjust volume on press (with edge detection)
-        if (volumeDownWasPressed && ! volumeDownWasPressed)
+        if (volumeDownPressed && ! volumeDownWasPressed)
+        {
             audio->setMasterVolume (audio->getMasterVolumeLevel() - 1);
+            config.audioMasterVolume = audio->getMasterVolumeLevel();
+            config.save();
+        }
         if (volumeUpPressed && ! volumeUpWasPressed)
+        {
             audio->setMasterVolume (audio->getMasterVolumeLevel() + 1);
+            config.audioMasterVolume = audio->getMasterVolumeLevel();
+            config.save();
+        }
 
         volumeDownWasPressed = volumeDownPressed;
         volumeUpWasPressed = volumeUpPressed;
@@ -305,7 +318,7 @@ void Game::startGame()
     float arenaW, arenaH;
     getWindowSize (arenaW, arenaH);
 
-    int numIslands = 2 + rand() % 10; // 2-11 islands
+    int numIslands = 1 + rand() % 5; // 1-5 islands
     for (int i = 0; i < numIslands; ++i)
     {
         bool validPosition = false;
@@ -364,6 +377,13 @@ void Game::startGame()
     targetWind = wind;
     windChangeTimer = config.windChangeInterval;
 
+    // Initialize current
+    float currentAngle = ((float) rand() / RAND_MAX) * 2.0f * pi;
+    float currentStrengthInit = config.currentMinStrength + ((float) rand() / RAND_MAX) * (config.currentMaxStrength - config.currentMinStrength);
+    current = Vec2::fromAngle (currentAngle) * currentStrengthInit;
+    targetCurrent = current;
+    currentChangeTimer = config.currentChangeInterval;
+
     state = GameState::Playing;
 }
 
@@ -392,6 +412,31 @@ void Game::updateWind (float dt)
     wind.y += (targetWind.y - wind.y) * config.windLerpSpeed * dt;
 }
 
+void Game::updateCurrent (float dt)
+{
+    // Update current change timer
+    currentChangeTimer -= dt;
+    if (currentChangeTimer <= 0)
+    {
+        // Pick new target current - minor adjustment from current direction
+        float currentAngle = std::atan2 (current.y, current.x);
+        float angleChange = ((float) rand() / RAND_MAX - 0.5f) * config.windAngleChangeMax * 2.0f;
+        float newAngle = currentAngle + angleChange;
+
+        // Small strength change, minimum strength enforced
+        float currentStrength = current.length();
+        float strengthChange = ((float) rand() / RAND_MAX - 0.5f) * config.windStrengthChangeMax;
+        float newStrength = std::clamp (currentStrength + strengthChange, config.currentMinStrength, config.currentMaxStrength);
+
+        targetCurrent = Vec2::fromAngle (newAngle) * newStrength;
+        currentChangeTimer = config.currentChangeInterval;
+    }
+
+    // Slowly lerp current toward target
+    current.x += (targetCurrent.x - current.x) * config.currentLerpSpeed * dt;
+    current.y += (targetCurrent.y - current.y) * config.currentLerpSpeed * dt;
+}
+
 void Game::updatePlaying (float dt)
 {
     float arenaWidth, arenaHeight;
@@ -403,8 +448,9 @@ void Game::updatePlaying (float dt)
         gameStartDelay -= dt;
     }
 
-    // Update wind
+    // Update wind and current
     updateWind (dt);
+    updateCurrent (dt);
 
     // Update ships
     int numShips = getNumShipsForMode();
@@ -448,7 +494,7 @@ void Game::updatePlaying (float dt)
             fireInput = aiControllers[shipIdx]->getFireInput();
         }
 
-        ships[shipIdx]->update (dt, moveInput, aimInput, fireInput, arenaWidth, arenaHeight, wind);
+        ships[shipIdx]->update (dt, moveInput, aimInput, fireInput, arenaWidth, arenaHeight, wind, current);
 
         // Set crosshair directly for mouse aiming
         if (isHumanControlled && players[playerIdx]->isUsingMouse())
@@ -514,7 +560,7 @@ void Game::updateGameOver (float dt)
     int numShips = getNumShipsForMode();
     for (int i = 0; i < numShips; ++i)
         if (ships[i] && ships[i]->isVisible())
-            ships[i]->update (dt, { 0, 0 }, { 0, 0 }, false, arenaWidth, arenaHeight, wind);
+            ships[i]->update (dt, { 0, 0 }, { 0, 0 }, false, arenaWidth, arenaHeight, wind, current);
 
     // Keep updating shells so they land and disappear
     updateShells (dt);
@@ -1183,8 +1229,11 @@ void Game::renderPlaying()
         }
     }
 
-    // Draw wind indicator
+    // Draw wind indicator (bottom-left)
     renderer->drawWindIndicator (wind, w, h);
+
+    // Draw current indicator (bottom-right)
+    renderer->drawCurrentIndicator (current, w, h);
 
     // Draw team ship counters for Battle mode
     if (gameMode == GameMode::Battle)
@@ -1271,7 +1320,7 @@ void Game::renderGameOver()
     int numShips = getNumShipsForMode();
     float damageY = h / 2.0f + 80.0f;
     std::string damageHeader = "DAMAGE DEALT";
-    renderer->drawTextCentered (damageHeader, { w / 2.0f, damageY }, 1.8f, statsColor);
+    renderer->drawTextCentered (damageHeader, { w / 2.0f, damageY }, 2.5f, statsColor);
 
     // Create sorted list of ship indices by damage dealt
     std::vector<int> sortedShips;
@@ -1283,14 +1332,14 @@ void Game::renderGameOver()
         return ships[a]->getDamageDealt() > ships[b]->getDamageDealt();
     });
 
-    damageY += 25.0f;
+    damageY += 35.0f;
     for (int idx : sortedShips)
     {
         int damage = (int) ships[idx]->getDamageDealt();
         std::string label = "P" + std::to_string (idx + 1) + ": " + std::to_string (damage);
         Color shipColor = ships[idx]->getColor();
-        renderer->drawTextCentered (label, { w / 2.0f, damageY }, 1.5f, shipColor);
-        damageY += 20.0f;
+        renderer->drawTextCentered (label, { w / 2.0f, damageY }, 2.0f, shipColor);
+        damageY += 28.0f;
     }
 }
 
@@ -1349,27 +1398,11 @@ Vec2 Game::getShipStartPosition (int index) const
             return { w - margin, y };
     }
 
-    // FFA mode: Place ships in corners
-    float margin = 150.0f;
-
-    // Corner positions: top-left, top-right, bottom-right, bottom-left
-    Vec2 corners[4] = {
-        { margin, margin },           // top-left
-        { w - margin, margin },       // top-right
-        { w - margin, h - margin },   // bottom-right
-        { margin, h - margin }        // bottom-left
-    };
-
-    int numShips = getNumShipsForMode();
-    if (numShips <= 4)
-    {
-        return corners[index % 4];
-    }
-
-    // For more than 4 ships, fall back to circle
+    // FFA mode: Place ships equidistant in a circle around the center
     Vec2 center = { w / 2.0f, h / 2.0f };
     float radius = std::min (w, h) * 0.35f;
-    float angleOffset = -pi / 2.0f;
+    int numShips = getNumShipsForMode();
+    float angleOffset = -pi / 2.0f;  // Start from top
     float angle = angleOffset + (index * 2.0f * pi / numShips);
     return center + Vec2::fromAngle (angle) * radius;
 }
@@ -1403,25 +1436,11 @@ float Game::getShipStartAngle (int index) const
             return pi;    // Team 1 faces left
     }
 
-    // FFA mode: Point ships toward center from corners
+    // FFA mode: Point ships toward center from circle position
     int numShips = getNumShipsForMode();
-    if (numShips <= 4)
-    {
-        // Angles pointing toward center from each corner
-        // top-left -> down-right, top-right -> down-left, etc.
-        float cornerAngles[4] = {
-            pi / 4.0f,          // top-left faces down-right
-            3.0f * pi / 4.0f,   // top-right faces down-left
-            -3.0f * pi / 4.0f,  // bottom-right faces up-left
-            -pi / 4.0f          // bottom-left faces up-right
-        };
-        return cornerAngles[index % 4];
-    }
-
-    // For more than 4 ships, point toward center from circle position
     float angleOffset = -pi / 2.0f;
     float posAngle = angleOffset + (index * 2.0f * pi / numShips);
-    return posAngle + pi;
+    return posAngle + pi;  // Face toward center
 }
 
 void Game::getWindowSize (float& width, float& height) const

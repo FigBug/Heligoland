@@ -98,7 +98,7 @@ public:
     float shellRangeVariation         = 0.05f;    // Random range variation (0.05 = ±5%)
     float shellRadius                 = 2.0f;
     float shellSplashRadius           = 4.0f;      // Hit detection radius when shell lands
-    float minShellRange               = 50.0f;     // Minimum range shells can travel
+    float minShellRange               = 90.0f;     // Minimum range shells can travel (20% of max)
     float maxShellRange               = 450.0f;    // Maximum range shells can travel
 
     // -------------------------------------------------------------------------
@@ -149,6 +149,15 @@ public:
     float windStrengthChangeMax       = 0.4f;      // Max strength change
 
     // -------------------------------------------------------------------------
+    // Current
+    // -------------------------------------------------------------------------
+    float currentChangeInterval       = 90.0f;     // Seconds between current target changes
+    float currentLerpSpeed            = 0.03f;     // How fast current changes (slower than wind)
+    float currentMaxStrength          = 0.3f;      // Max current strength (pixels per second multiplier)
+    float currentMinStrength          = 0.1f;      // Minimum current strength
+    float currentShipEffect           = 0.5f;      // How much current affects ship speed (pixels/sec)
+
+    // -------------------------------------------------------------------------
     // Collision
     // -------------------------------------------------------------------------
     float collisionRestitution        = 0.5f;      // Bounciness (0 = inelastic, 1 = elastic)
@@ -174,13 +183,14 @@ public:
     float audioEngineBaseVolume       = 0.3f;
     float audioEngineThrottleBoost    = 0.7f;
     float audioMinImpactForSound      = 2.0f;      // Min collision speed for sound
+    int   audioMasterVolume           = 5;         // Master volume level (0-10)
 
     // -------------------------------------------------------------------------
     // Game Flow
     // -------------------------------------------------------------------------
     float gameStartDelay              = 0.5f;      // Ignore fire input for this long
     float gameOverTextDelay           = 5.0f;      // Delay before showing winner text
-    float gameOverReturnDelay         = 8.0f;      // Total delay before returning to title
+    float gameOverReturnDelay         = 13.0f;     // Total delay before returning to title
 
     // -------------------------------------------------------------------------
     // Colors - Environment
@@ -255,6 +265,13 @@ public:
     Color colorWindBackground         = { 30, 30, 30, 200 };
     Color colorWindBorder             = { 100, 100, 100, 255 };
     Color colorWindArrow              = { 200, 200, 255, 255 };
+
+    // -------------------------------------------------------------------------
+    // Colors - Current Indicator
+    // -------------------------------------------------------------------------
+    Color colorCurrentBackground      = { 30, 30, 30, 200 };
+    Color colorCurrentBorder          = { 100, 100, 100, 255 };
+    Color colorCurrentArrow           = { 100, 200, 255, 255 };  // Blue-ish for water
 
     // -------------------------------------------------------------------------
     // Islands
