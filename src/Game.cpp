@@ -431,11 +431,18 @@ void Game::updatePlaying (float dt)
         {
             // Find all living enemy ships for AI
             std::vector<const Ship*> enemies;
+            std::vector<const Ship*> friendlies;
             for (int j = 0; j < numShips; ++j)
-                if (areEnemies (shipIdx, j) && ships[j] && ships[j]->isAlive())
+            {
+                if (j == shipIdx || !ships[j] || !ships[j]->isAlive())
+                    continue;
+                if (areEnemies (shipIdx, j))
                     enemies.push_back (ships[j].get());
+                else
+                    friendlies.push_back (ships[j].get());
+            }
 
-            aiControllers[shipIdx]->update (dt, *ships[shipIdx], enemies, shells, islands, arenaWidth, arenaHeight);
+            aiControllers[shipIdx]->update (dt, *ships[shipIdx], enemies, friendlies, shells, islands, arenaWidth, arenaHeight);
             moveInput = aiControllers[shipIdx]->getMoveInput();
             aimInput = aiControllers[shipIdx]->getAimInput();
             fireInput = aiControllers[shipIdx]->getFireInput();
@@ -1260,23 +1267,30 @@ void Game::renderGameOver()
         renderer->drawTextCentered (statsText, { w / 2.0f, h / 2.0f + 40.0f }, 2.5f, statsColor);
     }
 
-    // Display damage dealt by each ship
+    // Display damage dealt by each ship, sorted from most to least
     int numShips = getNumShipsForMode();
     float damageY = h / 2.0f + 80.0f;
     std::string damageHeader = "DAMAGE DEALT";
     renderer->drawTextCentered (damageHeader, { w / 2.0f, damageY }, 1.8f, statsColor);
 
-    damageY += 25.0f;
+    // Create sorted list of ship indices by damage dealt
+    std::vector<int> sortedShips;
     for (int i = 0; i < numShips; ++i)
-    {
         if (ships[i])
-        {
-            int damage = (int) ships[i]->getDamageDealt();
-            std::string label = "P" + std::to_string (i + 1) + ": " + std::to_string (damage);
-            float xOffset = (i - (numShips - 1) / 2.0f) * 80.0f;
-            Color shipColor = ships[i]->getColor();
-            renderer->drawTextCentered (label, { w / 2.0f + xOffset, damageY }, 1.5f, shipColor);
-        }
+            sortedShips.push_back (i);
+
+    std::sort (sortedShips.begin(), sortedShips.end(), [this] (int a, int b) {
+        return ships[a]->getDamageDealt() > ships[b]->getDamageDealt();
+    });
+
+    damageY += 25.0f;
+    for (int idx : sortedShips)
+    {
+        int damage = (int) ships[idx]->getDamageDealt();
+        std::string label = "P" + std::to_string (idx + 1) + ": " + std::to_string (damage);
+        Color shipColor = ships[idx]->getColor();
+        renderer->drawTextCentered (label, { w / 2.0f, damageY }, 1.5f, shipColor);
+        damageY += 20.0f;
     }
 }
 

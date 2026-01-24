@@ -18,12 +18,12 @@ AIController::AIController()
     personalityFactor = dist (gen);
 }
 
-void AIController::update (float dt, Ship& myShip, const std::vector<const Ship*>& enemies, const std::vector<Shell>& shells, const std::vector<Island>& islands, float arenaWidth, float arenaHeight)
+void AIController::update (float dt, Ship& myShip, const std::vector<const Ship*>& enemies, const std::vector<const Ship*>& friendlies, const std::vector<Shell>& shells, const std::vector<Island>& islands, float arenaWidth, float arenaHeight)
 {
     currentMode = determineMode (myShip, enemies);
     const Ship* target = findTarget (myShip, enemies);
 
-    updateMovement (dt, myShip, enemies, shells, islands, arenaWidth, arenaHeight);
+    updateMovement (dt, myShip, enemies, friendlies, shells, islands, arenaWidth, arenaHeight);
     updateAim (myShip, target);
 }
 
@@ -102,7 +102,7 @@ const Ship* AIController::findTarget (const Ship& myShip, const std::vector<cons
     return nearest;
 }
 
-void AIController::updateMovement (float dt, const Ship& myShip, const std::vector<const Ship*>& enemies, const std::vector<Shell>& shells, const std::vector<Island>& islands, float arenaWidth, float arenaHeight)
+void AIController::updateMovement (float dt, const Ship& myShip, const std::vector<const Ship*>& enemies, const std::vector<const Ship*>& friendlies, const std::vector<Shell>& shells, const std::vector<Island>& islands, float arenaWidth, float arenaHeight)
 {
     Vec2 myPos = myShip.getPosition();
     Vec2 vel = myShip.getVelocity();
@@ -235,59 +235,91 @@ void AIController::updateMovement (float dt, const Ship& myShip, const std::vect
             float enemyAngle = target->getAngle();
             float myRange = myShip.getMaxRange();
 
-            // Calculate if we're in the enemy's firing arc (front 180 degrees)
-            Vec2 enemyForward = Vec2::fromAngle (enemyAngle);
-            Vec2 enemyToUs = (myPos - target->getPosition()).normalized();
-            float dotProduct = enemyForward.dot (enemyToUs);
-            bool inEnemyFiringArc = dotProduct > 0.0f;  // Enemy can see us
-
-            // Ideal distance - stay just inside our max range, but outside if enemy is aiming at us
-            float idealDist = myRange * 0.9f * personalityFactor;
-            if (inEnemyFiringArc && dist < myRange * personalityFactor)
+            // Check how many enemies are nearby - don't try broadside maneuvers in a crowded fight
+            int nearbyEnemies = 0;
+            float nearbyThreshold = myRange * 1.5f;
+            for (const Ship* enemy : enemies)
             {
-                // Enemy can shoot at us - prefer to stay further back
-                idealDist = myRange * 1.05f * personalityFactor;
+                float enemyDist = (enemy->getPosition() - myPos).length();
+                if (enemyDist < nearbyThreshold)
+                    nearbyEnemies++;
             }
 
-            float tolerance = 40.0f * personalityFactor;
-
-            // Calculate perpendicular direction for circling (to get broadside)
-            Vec2 perpendicular = { -toEnemy.y, toEnemy.x };
-
-            // Check which perpendicular direction gets us more broadside to enemy
-            // We want to be perpendicular to the enemy's facing direction
-            Vec2 enemySide = { -enemyForward.y, enemyForward.x };
-            if (perpendicular.dot (enemySide) < 0)
-                perpendicular = perpendicular * -1.0f;
-
-            // Start broadside approach at 1.2x firing range
-            float broadsideStartDist = myRange * 1.2f * personalityFactor;
-
-            if (dist < idealDist - tolerance)
+            // If multiple enemies nearby, use simpler direct combat instead of broadside
+            if (nearbyEnemies > 1)
             {
-                // Too close - back away while circling
-                Vec2 awayDir = toEnemy.normalized() * -1.0f;
-                desiredDir = (awayDir + perpendicular * 0.5f).normalized();
-                desiredSpeed = 0.6f;
-            }
-            else if (dist > broadsideStartDist)
-            {
-                // Far away - approach directly to close distance faster
-                desiredDir = toEnemy.normalized();
-                desiredSpeed = 0.6f;
-            }
-            else if (dist > idealDist + tolerance)
-            {
-                // Within broadside range - approach at an angle to get broadside
-                Vec2 approachDir = toEnemy.normalized();
-                desiredDir = (approachDir + perpendicular * 0.8f).normalized();
-                desiredSpeed = 0.5f;
+                // Just approach/maintain distance from target without fancy maneuvering
+                float idealDist = myRange * 0.7f * personalityFactor;
+                if (dist > idealDist)
+                {
+                    desiredDir = toEnemy.normalized();
+                    desiredSpeed = 0.6f;
+                }
+                else
+                {
+                    // Keep some distance but face target
+                    Vec2 awayDir = toEnemy.normalized() * -1.0f;
+                    desiredDir = awayDir;
+                    desiredSpeed = 0.3f;
+                }
             }
             else
             {
-                // Good distance - circle to maintain broadside position
-                desiredDir = perpendicular;
-                desiredSpeed = 0.3f;
+                // Single enemy - use broadside tactics
+                // Calculate if we're in the enemy's firing arc (front 180 degrees)
+                Vec2 enemyForward = Vec2::fromAngle (enemyAngle);
+                Vec2 enemyToUs = (myPos - target->getPosition()).normalized();
+                float dotProduct = enemyForward.dot (enemyToUs);
+                bool inEnemyFiringArc = dotProduct > 0.0f;  // Enemy can see us
+
+                // Ideal distance - stay just inside our max range, but outside if enemy is aiming at us
+                float idealDist = myRange * 0.9f * personalityFactor;
+                if (inEnemyFiringArc && dist < myRange * personalityFactor)
+                {
+                    // Enemy can shoot at us - prefer to stay further back
+                    idealDist = myRange * 1.05f * personalityFactor;
+                }
+
+                float tolerance = 40.0f * personalityFactor;
+
+                // Calculate perpendicular direction for circling (to get broadside)
+                Vec2 perpendicular = { -toEnemy.y, toEnemy.x };
+
+                // Check which perpendicular direction gets us more broadside to enemy
+                // We want to be perpendicular to the enemy's facing direction
+                Vec2 enemySide = { -enemyForward.y, enemyForward.x };
+                if (perpendicular.dot (enemySide) < 0)
+                    perpendicular = perpendicular * -1.0f;
+
+                // Start broadside approach at 1.2x firing range
+                float broadsideStartDist = myRange * 1.2f * personalityFactor;
+
+                if (dist < idealDist - tolerance)
+                {
+                    // Too close - back away while circling
+                    Vec2 awayDir = toEnemy.normalized() * -1.0f;
+                    desiredDir = (awayDir + perpendicular * 0.5f).normalized();
+                    desiredSpeed = 0.6f;
+                }
+                else if (dist > broadsideStartDist)
+                {
+                    // Far away - approach directly to close distance faster
+                    desiredDir = toEnemy.normalized();
+                    desiredSpeed = 0.6f;
+                }
+                else if (dist > idealDist + tolerance)
+                {
+                    // Within broadside range - approach at an angle to get broadside
+                    Vec2 approachDir = toEnemy.normalized();
+                    desiredDir = (approachDir + perpendicular * 0.8f).normalized();
+                    desiredSpeed = 0.5f;
+                }
+                else
+                {
+                    // Good distance - circle to maintain broadside position
+                    desiredDir = perpendicular;
+                    desiredSpeed = 0.3f;
+                }
             }
         }
     }
@@ -295,8 +327,9 @@ void AIController::updateMovement (float dt, const Ship& myShip, const std::vect
     // Apply edge avoidance
     avoidEdges (myShip, arenaWidth, arenaHeight, desiredDir);
 
-    // Apply ship collision avoidance
+    // Apply ship collision avoidance (both enemies and friendlies)
     avoidShips (myShip, enemies, desiredDir);
+    avoidShips (myShip, friendlies, desiredDir);
 
     // Apply island avoidance
     avoidIslands (myShip, islands, desiredDir);
@@ -316,24 +349,28 @@ void AIController::updateMovement (float dt, const Ship& myShip, const std::vect
         // Turn toward target
         moveInput.x = std::clamp (angleDiff * 2.0f, -1.0f, 1.0f);
 
-        // Move forward if roughly facing target
+        // Always apply some throttle to avoid getting stuck
         if (std::abs (angleDiff) < pi * 0.5f)
         {
-            moveInput.y = -desiredSpeed; // Negative Y is forward
+            // Facing target - full speed forward
+            moveInput.y = -desiredSpeed;
         }
         else if (std::abs (angleDiff) > pi * 0.75f)
         {
-            // Facing away - reverse a bit while turning
-            moveInput.y = 0.2f;
+            // Facing away - reverse while turning
+            moveInput.y = 0.3f;
         }
         else
         {
-            moveInput.y = 0.0f;
+            // Sideways - slow forward while turning
+            moveInput.y = -0.2f;
         }
     }
     else
     {
-        moveInput = { 0, 0 };
+        // No clear direction - just move forward slowly to avoid getting stuck
+        moveInput.x = 0.0f;
+        moveInput.y = -0.3f;
     }
 }
 
@@ -385,7 +422,7 @@ void AIController::avoidEdges (const Ship& myShip, float arenaWidth, float arena
     }
 }
 
-void AIController::avoidShips (const Ship& myShip, const std::vector<const Ship*>& enemies, Vec2& desiredDir)
+void AIController::avoidShips (const Ship& myShip, const std::vector<const Ship*>& otherShips, Vec2& desiredDir)
 {
     Vec2 myPos = myShip.getPosition();
     Vec2 myVel = myShip.getVelocity();
@@ -398,7 +435,7 @@ void AIController::avoidShips (const Ship& myShip, const std::vector<const Ship*
     // Danger zone scales with speed - faster = need more room
     float dangerRadius = myLength * 2.0f + mySpeed * 1.0f;
 
-    for (const Ship* other : enemies)
+    for (const Ship* other : otherShips)
     {
         if (! other->isVisible())
             continue;
@@ -459,15 +496,24 @@ void AIController::avoidIslands (const Ship& myShip, const std::vector<Island>& 
     Vec2 avoidDir = { 0, 0 };
     float maxUrgency = 0.0f;
 
-    float lookAhead = myLength * 2.0f + mySpeed * config.aiLookAheadTime;
-
     for (const auto& island : islands)
     {
         Vec2 toIsland = island.getCenter() - myPos;
         float dist = toIsland.length();
         float dangerDist = island.getBoundingRadius() + myLength * 1.5f;
 
-        if (dist < dangerDist * 2.0f)
+        // Very close or inside island - emergency escape regardless of heading
+        if (dist < dangerDist)
+        {
+            float urgency = 1.0f - dist / dangerDist;
+            urgency = std::clamp (urgency, 0.3f, 1.0f);
+
+            // Always steer away when too close
+            Vec2 away = toIsland.normalized() * -1.0f;
+            avoidDir = avoidDir + away * urgency;
+            maxUrgency = std::max (maxUrgency, urgency);
+        }
+        else if (dist < dangerDist * 2.0f)
         {
             // Check if heading toward island
             Vec2 myDir = mySpeed > 0.1f ? myVel.normalized() : Vec2::fromAngle (myShip.getAngle());
@@ -500,7 +546,7 @@ void AIController::avoidIslands (const Ship& myShip, const std::vector<Island>& 
     if (avoidDir.lengthSquared() > 0.01f)
     {
         avoidDir = avoidDir.normalized();
-        maxUrgency = std::clamp (maxUrgency, 0.0f, 0.9f);
+        maxUrgency = std::clamp (maxUrgency, 0.0f, 0.95f);
         desiredDir = desiredDir * (1.0f - maxUrgency) + avoidDir * maxUrgency;
         if (desiredDir.lengthSquared() > 0.01f)
             desiredDir = desiredDir.normalized();
