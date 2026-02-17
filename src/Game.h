@@ -82,6 +82,10 @@ private:
     std::array<int, MAX_PLAYERS> aiShipSelection = {};
     float aiShipChangeTimer = 0.0f;
 
+    // Ready-up / lock-in system
+    std::array<bool, MAX_PLAYERS> playerLockedIn = {};
+    float lockInCountdown = -1.0f;  // Negative = not counting down
+
     // Wind system
     Vec2 wind; // Current wind direction and strength (length = strength 0-1)
     Vec2 targetWind; // Wind is slowly moving toward this target

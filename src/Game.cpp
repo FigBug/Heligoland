@@ -122,7 +122,18 @@ void Game::update (float dt)
 
 void Game::updateTitle (float dt)
 {
-    // Check for mode switching with bumpers or arrow keys
+    // Check if any human player is locked in (blocks mode switching)
+    bool anyLockedIn = false;
+    for (int i = 0; i < MAX_PLAYERS; ++i)
+    {
+        if (players[i]->isConnected() && playerLockedIn[i])
+            anyLockedIn = true;
+        // Unlock disconnected players
+        if (!players[i]->isConnected())
+            playerLockedIn[i] = false;
+    }
+
+    // Check for mode switching with bumpers or arrow keys (only if nobody is locked in)
     static bool leftWasPressed = false;
     static bool rightWasPressed = false;
 
@@ -141,16 +152,19 @@ void Game::updateTitle (float dt)
         }
     }
 
-    // Cycle mode on press (with edge detection)
-    if (leftPressed && ! leftWasPressed)
-        cycleGameMode (-1);
-    if (rightPressed && ! rightWasPressed)
-        cycleGameMode (1);
+    // Cycle mode on press (with edge detection, blocked when anyone is locked in)
+    if (!anyLockedIn)
+    {
+        if (leftPressed && ! leftWasPressed)
+            cycleGameMode (-1);
+        if (rightPressed && ! rightWasPressed)
+            cycleGameMode (1);
+    }
 
     leftWasPressed = leftPressed;
     rightWasPressed = rightPressed;
 
-    // Ship selection with D-pad or face buttons for each connected player
+    // Ship selection with D-pad or face buttons for each connected player (blocked when locked in)
     static std::array<bool, MAX_PLAYERS> upWasPressed = {};
     static std::array<bool, MAX_PLAYERS> downWasPressed = {};
 
@@ -178,14 +192,17 @@ void Game::updateTitle (float dt)
                 downPressed = true;
         }
 
-        // Cycle ship selection with edge detection
-        if (upPressed && !upWasPressed[i])
+        // Cycle ship selection with edge detection (only if this player is NOT locked in)
+        if (!playerLockedIn[i])
         {
-            playerShipSelection[i] = (playerShipSelection[i] + 1) % NUM_SHIP_TYPES;
-        }
-        if (downPressed && !downWasPressed[i])
-        {
-            playerShipSelection[i] = (playerShipSelection[i] + NUM_SHIP_TYPES - 1) % NUM_SHIP_TYPES;
+            if (upPressed && !upWasPressed[i])
+            {
+                playerShipSelection[i] = (playerShipSelection[i] + 1) % NUM_SHIP_TYPES;
+            }
+            if (downPressed && !downWasPressed[i])
+            {
+                playerShipSelection[i] = (playerShipSelection[i] + NUM_SHIP_TYPES - 1) % NUM_SHIP_TYPES;
+            }
         }
 
         upWasPressed[i] = upPressed;
@@ -247,10 +264,70 @@ void Game::updateTitle (float dt)
         aiShipChangeTimer = 0.3f + (rand() % 100) / 200.0f; // 0.3-0.8 seconds
     }
 
-    // Check if any button or click is pressed to start the game
-    if (anyButtonPressed())
+    // Ready-up: A button to lock in, B button to back out
+    for (int i = 0; i < MAX_PLAYERS; ++i)
     {
-        startGame();
+        if (!players[i]->isConnected())
+            continue;
+
+        bool lockInPressed = false;
+        bool backOutPressed = false;
+
+        if (IsGamepadAvailable (i))
+        {
+            lockInPressed = IsGamepadButtonPressed (i, GAMEPAD_BUTTON_RIGHT_FACE_DOWN);   // A / Cross
+            backOutPressed = IsGamepadButtonPressed (i, GAMEPAD_BUTTON_RIGHT_FACE_RIGHT);  // B / Circle
+        }
+
+        // Player 0 can also use keyboard/mouse
+        if (i == 0)
+        {
+            if (IsKeyPressed (KEY_ENTER) || IsKeyPressed (KEY_SPACE) || IsMouseButtonPressed (MOUSE_BUTTON_LEFT))
+                lockInPressed = true;
+            if (IsKeyPressed (KEY_BACKSPACE))
+                backOutPressed = true;
+        }
+
+        if (lockInPressed && !playerLockedIn[i])
+            playerLockedIn[i] = true;
+
+        if (backOutPressed && playerLockedIn[i])
+            playerLockedIn[i] = false;
+    }
+
+    // Check if all human players are locked in
+    bool allLockedIn = true;
+    int humanCount = 0;
+    for (int i = 0; i < MAX_PLAYERS; ++i)
+    {
+        if (players[i]->isConnected())
+        {
+            humanCount++;
+            if (!playerLockedIn[i])
+                allLockedIn = false;
+        }
+    }
+
+    // Need at least one human player
+    if (humanCount == 0)
+        allLockedIn = false;
+
+    // Countdown logic
+    if (allLockedIn)
+    {
+        if (lockInCountdown < 0.0f)
+            lockInCountdown = 3.0f; // Start 3-second countdown
+
+        lockInCountdown -= dt;
+        if (lockInCountdown <= 0.0f)
+        {
+            lockInCountdown = -1.0f;
+            startGame();
+        }
+    }
+    else
+    {
+        lockInCountdown = -1.0f; // Reset countdown if anyone backs out
     }
 }
 
@@ -606,6 +683,11 @@ void Game::returnToTitle()
     }
     shells.clear();
     explosions.clear();
+
+    // Reset ready-up state
+    playerLockedIn = {};
+    lockInCountdown = -1.0f;
+
     state = GameState::Title;
 }
 
@@ -1040,6 +1122,31 @@ void Game::renderTitle()
         }
     };
 
+    // Helper to draw a player slot (ship preview + label + ready status)
+    auto drawPlayerSlot = [&] (int i, Vec2 slotPos)
+    {
+        Color slotColor = getPlayerColor (i);
+
+        if (players[i]->isConnected())
+        {
+            renderer->drawShipPreview (playerShipSelection[i], slotPos, -pi / 4.0f, i);
+            renderer->drawTextCentered ("P" + std::to_string (i + 1), { slotPos.x, slotPos.y + 50.0f }, 2.0f, slotColor);
+            std::string shipName = config.shipTypes[playerShipSelection[i]].name;
+            renderer->drawTextCentered (shipName, { slotPos.x, slotPos.y + 70.0f }, 1.5f, config.colorGreyLight);
+
+            // Show ready status
+            if (playerLockedIn[i])
+                renderer->drawTextCentered ("READY", { slotPos.x, slotPos.y + 90.0f }, 2.0f, config.colorReloadReady);
+        }
+        else
+        {
+            renderer->drawShipPreview (aiShipSelection[i], slotPos, -pi / 4.0f, i);
+            renderer->drawTextCentered ("AI", { slotPos.x, slotPos.y + 50.0f }, 2.0f, config.colorGreyDark);
+            std::string shipName = config.shipTypes[aiShipSelection[i]].name;
+            renderer->drawTextCentered (shipName, { slotPos.x, slotPos.y + 70.0f }, 1.5f, config.colorGreyLight);
+        }
+    };
+
     if (gameMode == GameMode::Teams || gameMode == GameMode::Battle)
     {
         // Team modes: use FFA layout but with a gap in the center
@@ -1062,29 +1169,15 @@ void Game::renderTitle()
                 slotPos = { team1Center + (i - 0.5f) * slotSpacing, slotY };
             else
                 slotPos = { team2Center + (i - 2.5f) * slotSpacing, slotY };
-            Color slotColor = getPlayerColor (i);
 
-            if (players[i]->isConnected())
-            {
-                renderer->drawShipPreview (playerShipSelection[i], slotPos, -pi / 4.0f, i);
-                renderer->drawTextCentered ("P" + std::to_string (i + 1), { slotPos.x, slotPos.y + 50.0f }, 2.0f, slotColor);
-                std::string shipName = config.shipTypes[playerShipSelection[i]].name;
-                renderer->drawTextCentered (shipName, { slotPos.x, slotPos.y + 70.0f }, 1.5f, config.colorGreyLight);
-            }
-            else
-            {
-                renderer->drawShipPreview (aiShipSelection[i], slotPos, -pi / 4.0f, i);
-                renderer->drawTextCentered ("AI", { slotPos.x, slotPos.y + 50.0f }, 2.0f, config.colorGreyDark);
-                std::string shipName = config.shipTypes[aiShipSelection[i]].name;
-                renderer->drawTextCentered (shipName, { slotPos.x, slotPos.y + 70.0f }, 1.5f, config.colorGreyLight);
-            }
+            drawPlayerSlot (i, slotPos);
         }
 
         if (gameMode == GameMode::Battle)
         {
             // Show "+4 AI" indicators for each team
-            renderer->drawTextCentered ("+4 AI", { team1Center, slotY + 90.0f }, 1.5f, config.colorGreySubtle);
-            renderer->drawTextCentered ("+4 AI", { team2Center, slotY + 90.0f }, 1.5f, config.colorGreySubtle);
+            renderer->drawTextCentered ("+4 AI", { team1Center, slotY + 110.0f }, 1.5f, config.colorGreySubtle);
+            renderer->drawTextCentered ("+4 AI", { team2Center, slotY + 110.0f }, 1.5f, config.colorGreySubtle);
         }
     }
     else
@@ -1094,32 +1187,7 @@ void Game::renderTitle()
         for (int i = 0; i < numSlots; ++i)
         {
             Vec2 slotPos = { startX + i * slotSpacing, slotY };
-            Color slotColor = getPlayerColor (i);
-
-            if (players[i]->isConnected())
-            {
-                // Draw ship preview (45 degrees) with player color on turrets
-                renderer->drawShipPreview (playerShipSelection[i], slotPos, -pi / 4.0f, i);
-
-                // Draw player label below
-                renderer->drawTextCentered ("P" + std::to_string (i + 1), { slotPos.x, slotPos.y + 50.0f }, 2.0f, slotColor);
-
-                // Draw ship type name
-                std::string shipName = config.shipTypes[playerShipSelection[i]].name;
-                renderer->drawTextCentered (shipName, { slotPos.x, slotPos.y + 70.0f }, 1.5f, config.colorGreyLight);
-            }
-            else
-            {
-                // Draw AI ship preview with random cycling ship type
-                renderer->drawShipPreview (aiShipSelection[i], slotPos, -pi / 4.0f, i);
-
-                // Draw AI label below
-                renderer->drawTextCentered ("AI", { slotPos.x, slotPos.y + 50.0f }, 2.0f, config.colorGreyDark);
-
-                // Draw ship type name
-                std::string shipName = config.shipTypes[aiShipSelection[i]].name;
-                renderer->drawTextCentered (shipName, { slotPos.x, slotPos.y + 70.0f }, 1.5f, config.colorGreyLight);
-            }
+            drawPlayerSlot (i, slotPos);
         }
     }
 
@@ -1139,8 +1207,17 @@ void Game::renderTitle()
         renderer->drawTextCentered (volumeText, { w / 2.0f, h * 0.88f }, 2.0f, config.colorSubtitle);
     }
 
-    // Draw start instruction
-    renderer->drawTextCentered ("CLICK OR PRESS ANY BUTTON TO START", { w / 2.0f, h * 0.95f }, 2.0f, config.colorInstruction);
+    // Draw countdown or ready-up instructions
+    if (lockInCountdown > 0.0f)
+    {
+        int seconds = (int) std::ceil (lockInCountdown);
+        std::string countdownText = "STARTING IN " + std::to_string (seconds) + "...";
+        renderer->drawTextCentered (countdownText, { w / 2.0f, h * 0.95f }, 3.0f, config.colorModeText);
+    }
+    else
+    {
+        renderer->drawTextCentered ("PRESS A TO READY  -  B TO BACK OUT", { w / 2.0f, h * 0.95f }, 2.0f, config.colorInstruction);
+    }
 }
 
 void Game::renderPlaying()
