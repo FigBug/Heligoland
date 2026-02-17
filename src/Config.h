@@ -36,6 +36,7 @@ struct ShipType
     float rangeMultiplier = 1.0f;       // Firing range multiplier
     float damageMultiplier = 1.0f;      // Shell damage multiplier
     float turretSpeedMultiplier = 1.0f; // Turret rotation speed multiplier
+    float accelMultiplier = 1.0f;       // Acceleration/deceleration rate multiplier
 };
 
 constexpr int NUM_SHIP_TYPES = 4;
@@ -61,14 +62,14 @@ public:
     // -------------------------------------------------------------------------
     // Ship Physics
     // -------------------------------------------------------------------------
-    float shipMaxSpeed                = 7.0f;
+    float shipMaxSpeed                = 8.0f;
     float shipFullSpeedKnots          = 20.0f;     // Display speed at max velocity
-    float shipAccelTime               = 20.0f;     // Seconds to reach full speed or stop from full speed with throttle
-    float shipCoastStopTime           = 30.0f;     // Seconds to stop when coasting (no throttle)
+    float shipAccelTime               = 10.0f;     // Seconds to reach full speed or stop from full speed with throttle
+    float shipCoastStopTime           = 20.0f;     // Seconds to stop when coasting (no throttle)
     float shipThrottleRate            = 0.5f;      // How fast throttle changes per second
     float shipRudderRate              = 2.0f;      // How fast rudder moves
     float shipRudderReturn            = 3.0f;      // How fast rudder returns to center
-    float shipMinTurnRadiusMultiplier = 2.0f;      // Min turn radius = length * this
+    float shipMinTurnRadiusMultiplier = 1.0f;      // Min turn radius = length * this
     float shipDamagePenaltyMax        = 0.2f;      // Max speed/turn reduction at 0% health
     float shipSinkDuration            = 30.0f;     // Seconds to fully sink
     float shipSinkVelocityDecay       = 0.98f;
@@ -183,7 +184,7 @@ public:
     float audioEngineBaseVolume       = 0.3f;
     float audioEngineThrottleBoost    = 0.7f;
     float audioMinImpactForSound      = 2.0f;      // Min collision speed for sound
-    int   audioMasterVolume           = 5;         // Master volume level (0-10)
+    int   audioMasterVolume           = 2;         // Master volume level (0-10)
 
     // -------------------------------------------------------------------------
     // Game Flow

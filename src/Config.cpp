@@ -75,12 +75,13 @@ void Config::initDefaultShipTypes()
     shipTypes[0].numSmokeStacks = 1;
     shipTypes[0].smokeStackOffsets = { -0.12f, 0.0f };  // Single stack behind center
     shipTypes[0].healthMultiplier = 0.6f;
-    shipTypes[0].speedMultiplier = 1.4f;
-    shipTypes[0].turnMultiplier = 1.25f;
-    shipTypes[0].reloadMultiplier = 0.5f;       // Faster reload
+    shipTypes[0].speedMultiplier = 2.0f;
+    shipTypes[0].turnMultiplier = 1.5f;
+    shipTypes[0].reloadMultiplier = 0.33f;       // Faster reload
     shipTypes[0].rangeMultiplier = 0.65f;        // Short range
     shipTypes[0].damageMultiplier = 0.6f;       // Low damage
-    shipTypes[0].turretSpeedMultiplier = 1.4f;  // Fast turret
+    shipTypes[0].turretSpeedMultiplier = 2.0f;  // Fast turret
+    shipTypes[0].accelMultiplier = 1.8f;         // Quick acceleration
 
     // Ship Type 2: Frigate - 2 turrets, balanced
     shipTypes[1].name = "Frigate";
@@ -90,12 +91,13 @@ void Config::initDefaultShipTypes()
     shipTypes[1].numSmokeStacks = 1;
     shipTypes[1].smokeStackOffsets = { -0.13f, 0.0f };  // Single stack behind center
     shipTypes[1].healthMultiplier = 0.8f;
-    shipTypes[1].speedMultiplier = 1.15f;
-    shipTypes[1].turnMultiplier = 1.15f;
-    shipTypes[1].reloadMultiplier = 0.85f;
+    shipTypes[1].speedMultiplier = 1.5f;
+    shipTypes[1].turnMultiplier = 1.2f;
+    shipTypes[1].reloadMultiplier = 0.5f;
     shipTypes[1].rangeMultiplier = 0.85f;       // Medium-short range
     shipTypes[1].damageMultiplier = 0.8f;       // Medium-low damage
-    shipTypes[1].turretSpeedMultiplier = 1.15f; // Slightly fast turret
+    shipTypes[1].turretSpeedMultiplier = 1.5f; // Slightly fast turret
+    shipTypes[1].accelMultiplier = 1.4f;        // Moderate-fast acceleration
 
     // Ship Type 3: Cruiser - 3 turrets, standard
     shipTypes[2].name = "Cruiser";
@@ -112,6 +114,7 @@ void Config::initDefaultShipTypes()
     shipTypes[2].rangeMultiplier = 1.0f;        // Standard range
     shipTypes[2].damageMultiplier = 1.0f;       // Standard damage
     shipTypes[2].turretSpeedMultiplier = 1.0f;  // Standard turret
+    shipTypes[2].accelMultiplier = 1.0f;         // Standard acceleration
 
     // Ship Type 4: Battleship - 4 turrets, slow but powerful, long range, high damage
     shipTypes[3].name = "Battleship";
@@ -129,6 +132,7 @@ void Config::initDefaultShipTypes()
     shipTypes[3].rangeMultiplier = 1.15f;       // Long range
     shipTypes[3].damageMultiplier = 1.2f;       // High damage
     shipTypes[3].turretSpeedMultiplier = 0.8f;  // Slow turret
+    shipTypes[3].accelMultiplier = 0.6f;         // Sluggish acceleration
 }
 
 Config::~Config()

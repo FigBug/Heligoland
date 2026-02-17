@@ -113,9 +113,10 @@ void Ship::update (float dt, Vec2 moveInput, Vec2 aimInput, bool fireInput, floa
     // Calculate current speed with sign (positive = forward, negative = backward)
     float currentSpeed = velocity.dot (forward);
 
-    // Acceleration/deceleration rate based on shipAccelTime
-    float accelRate = config.shipMaxSpeed / config.shipAccelTime;
-    float coastDecelRate = config.shipMaxSpeed / config.shipCoastStopTime;
+    // Acceleration/deceleration rate based on shipAccelTime, modified by ship type
+    float accelMult = typeConfig.accelMultiplier;
+    float accelRate = config.shipMaxSpeed / config.shipAccelTime * accelMult;
+    float coastDecelRate = config.shipMaxSpeed / config.shipCoastStopTime * accelMult;
 
     // Gradually adjust speed toward target
     float speedDiff = targetSpeed - currentSpeed;
