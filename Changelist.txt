@@ -1,3 +1,6 @@
+0.0.13
+- Tweak speeds
+
 0.0.12
 - Added different types of ships
 - Added islands
