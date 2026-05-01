@@ -20,13 +20,75 @@ jobs:
         run: cmake --build build --config Release
 
       - name: Install Inno Setup
-        run: choco install innosetup -y
+        run: choco install innosetup --no-progress -y
 
-      - name: Create Installer
+      - name: Build and sign
+        shell: bash
+        env:
+          AZURE_TENANT_ID:     ${{ secrets.AZURE_TENANT_ID }}
+          AZURE_CLIENT_ID:     ${{ secrets.AZURE_CLIENT_ID }}
+          AZURE_CLIENT_SECRET: ${{ secrets.AZURE_CLIENT_SECRET }}
         run: |
-          $version = Get-Content VERSION -Raw
-          $version = $version.Trim()
-          & "C:\Program Files (x86)\Inno Setup 6\ISCC.exe" /DMyAppVersion=$version installer\windows\heligoland.iss
+          set -e
+          PROJECT_ROOT=$(pwd)
+          VERSION=$(cat VERSION | tr -d '[:space:]')
+
+          #
+          # Sign binaries via Microsoft Trusted Signing.
+          # Required env: AZURE_TENANT_ID, AZURE_CLIENT_ID, AZURE_CLIENT_SECRET.
+          # Cert is referenced via installer/windows/metadata.json.
+          #
+          uuid_re='^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$'
+          WIN_SIGN=0
+          if [ -n "${AZURE_TENANT_ID:-}" ] || [ -n "${AZURE_CLIENT_ID:-}" ] || [ -n "${AZURE_CLIENT_SECRET:-}" ]; then
+            if   [[ ! "${AZURE_TENANT_ID:-}" =~ $uuid_re ]]; then
+              echo "ERROR: AZURE_TENANT_ID is not a valid GUID — set the secret on the repo or unset all three to skip signing."; exit 1
+            elif [[ ! "${AZURE_CLIENT_ID:-}" =~ $uuid_re ]]; then
+              echo "ERROR: AZURE_CLIENT_ID is not a valid GUID — set the secret on the repo or unset all three to skip signing."; exit 1
+            elif [ -z "${AZURE_CLIENT_SECRET:-}" ]; then
+              echo "ERROR: AZURE_CLIENT_SECRET is empty — set the secret on the repo or unset all three to skip signing."; exit 1
+            else
+              WIN_SIGN=1
+            fi
+          fi
+
+          if [ "$WIN_SIGN" = "1" ]; then
+            SIGNTOOL=$(ls -1 "/c/Program Files (x86)/Windows Kits/10/bin/"*/x64/signtool.exe 2>/dev/null | sort | tail -1)
+            if [ -z "$SIGNTOOL" ]; then
+              echo "signtool.exe not found in Windows Kits"; exit 1
+            fi
+
+            TOOLS_DIR="$PROJECT_ROOT/build/_signingtools"
+            mkdir -p "$TOOLS_DIR"
+            nuget install Microsoft.Trusted.Signing.Client -Version 1.0.86 \
+                          -OutputDirectory "$TOOLS_DIR" -ExcludeVersion -NonInteractive
+            DLIB="$TOOLS_DIR/Microsoft.Trusted.Signing.Client/bin/x64/Azure.CodeSigning.Dlib.dll"
+            METADATA="$PROJECT_ROOT/installer/windows/metadata.json"
+
+            sign_file () {
+              "$SIGNTOOL" sign -v -fd SHA256 \
+                -tr "http://timestamp.acs.microsoft.com" -td SHA256 \
+                -dlib "$DLIB" -dmdf "$METADATA" "$1"
+            }
+
+            sign_file "$PROJECT_ROOT/build/Release/Heligoland.exe"
+          else
+            echo "Skipping Windows binary signing — Azure secrets not set"
+          fi
+
+          # Build installer
+          ISCC="/c/Program Files (x86)/Inno Setup 6/ISCC.exe"
+          if [ ! -f "$ISCC" ]; then
+            ISCC="/c/Program Files/Inno Setup 6/ISCC.exe"
+          fi
+          "$ISCC" "//DMyAppVersion=$VERSION" "$PROJECT_ROOT/installer/windows/heligoland.iss"
+
+          # Sign installer
+          if [ "$WIN_SIGN" = "1" ]; then
+            for exe in "$PROJECT_ROOT/build/"Heligoland-*.exe; do
+              sign_file "$exe"
+            done
+          fi
 
       - name: Upload Artifact
         uses: actions/upload-artifact@v4
