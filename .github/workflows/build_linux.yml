@@ -42,3 +42,4 @@ jobs:
         with:
           name: Heligoland_Linux
           path: build/heligoland_*.deb
+          retention-days: 3

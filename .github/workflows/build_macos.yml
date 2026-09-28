@@ -102,3 +102,4 @@ jobs:
         with:
           name: Heligoland_macOS
           path: build/Heligoland-*.pkg
+          retention-days: 3

@@ -95,3 +95,4 @@ jobs:
         with:
           name: Heligoland_Windows
           path: build/Heligoland-*.exe
+          retention-days: 3
